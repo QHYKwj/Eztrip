@@ -10,6 +10,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import hello from '@/components/HelloWorld.vue'
 // import { routes } from 'vue-router/auto-routes'
 import defaultlayout from '@/layouts/default.vue'
+import welcomehome from '@/pages/welcomehome.vue'
 const routes = [
   {
     path: '/',
@@ -18,6 +19,10 @@ const routes = [
       {
         path: '/hello',
         component: hello,
+      },
+      {
+        path: '/home',
+        component: welcomehome,
       },
     ],
   },

@@ -43,7 +43,7 @@
   content: "";
   flex: 1;
   height: 1px;
-  background-color: #676767;
+  background-color: white;
   margin-left: 8px;
 }
 </style>

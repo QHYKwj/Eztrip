@@ -18,5 +18,7 @@ declare module 'vue' {
     NavTitle: typeof import('./src/components/NavTitle.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SwiperCard: typeof import('./src/components/SwiperCard.vue')['default']
+    TripCard: typeof import('./src/components/TripCard.vue')['default']
   }
 }

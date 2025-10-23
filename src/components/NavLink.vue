@@ -1,11 +1,16 @@
 <template>
-  <v-list-item class="nav-link" link @click="goTo(item.to)">
+  <v-list-item
+    class="nav-link"
+    :class="{ active: isActive }"
+    link
+    @click="goTo(item.to)"
+  >
     <v-list-item-content>
-      <div
-        class="nav-link-content"
-        :class="{ mini: mini }"
-      >
-        <v-icon class="nav-link-icon" :class="{ mini: mini }">
+      <div class="nav-link-content" :class="{ mini: mini }">
+        <v-icon
+          class="nav-link-icon"
+          :class="{ mini: mini, active: isActive }"
+        >
           {{ item.icon }}
         </v-icon>
         <span v-if="!mini" class="nav-link-text">
@@ -29,9 +34,17 @@
         default: false,
       },
     },
+    computed: {
+      isActive () {
+        // 根据当前路由是否匹配判断高亮
+        return this.$route.path === this.item.to
+      },
+    },
     methods: {
       goTo (route) {
-        if (route) this.$router.push(route)
+        if (route && this.$route.path !== route) {
+          this.$router.push(route)
+        }
       },
     },
   }
@@ -41,6 +54,12 @@
 .nav-link {
   padding-left: 12px;
   padding-right: 12px;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+
+.nav-link:hover {
+  background-color: rgba(103, 80, 150, 0.1);
 }
 
 .nav-link-content {
@@ -48,27 +67,42 @@
   align-items: center;
 }
 
-/* 收起时 icon 居中 */
+/* 收起时居中 */
 .nav-link-content.mini {
   justify-content: center;
 }
 
-/* 默认 icon 样式 */
+/* 默认图标颜色 */
 .nav-link-icon {
   font-size: 20px;
-  margin-right: 8px;
+  margin-right: 6px;
+  color: #675096;
+  transition: color 0.3s ease;
 }
 
-/* 收起时 icon 居中且自适应 */
+/* 收起时 icon 居中 */
 .nav-link-icon.mini {
-  margin-right: 0;
-  font-size: 28px;       /* 让图标稍微大一点 */
+  margin:0 auto;
+  font-size: 28px;
   width: 100%;
-  text-align: center;    /* 水平居中 */
-  object-fit: contain;   /* 模拟 aspect-fit 效果 */
+  text-align: center;
+}
+
+/* 激活状态图标高亮 */
+.nav-link-icon.active {
+  color: #742DD8;
 }
 
 .nav-link-text {
   font-size: 17px;
+  color: #444;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1px;
+}
+
+.nav-link.active .nav-link-text {
+  color: #742DD8;
+  font-weight: 600;
 }
 </style>
