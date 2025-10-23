@@ -97,7 +97,7 @@
 
 /* logo */
 .logo-container {
-  margin-left: 4vh;
+  display: flex;
   justify-content: center;
   align-items: center;
   padding: 24px 0;
