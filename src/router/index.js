@@ -10,6 +10,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import hello from '@/components/HelloWorld.vue'
 // import { routes } from 'vue-router/auto-routes'
 import defaultlayout from '@/layouts/default.vue'
+import login from '@/pages/login.vue'
+import register from '@/pages/register.vue'
+import forgotPassword from "@/pages/forgot-password.vue";
 import welcomehome from '@/pages/welcomehome.vue'
 const routes = [
   {
@@ -25,6 +28,18 @@ const routes = [
         component: welcomehome,
       },
     ],
+  },
+  {
+    path: '/login',
+    component: login,
+  },
+  {
+    path: '/register',
+    component: register,
+  },
+  {
+    path: '/forgot-password',
+    component: forgotPassword,
   },
 ]
 const router = createRouter({
