@@ -1,6 +1,6 @@
 <template>
   <v-card
-    class="mx-auto my-12"
+    class="trip-card w-100 mx-auto my-12"
     :loading="loading"
     max-width="600"
   >
@@ -12,12 +12,9 @@
       />
     </template>
 
-    <v-img
-      height="250"
-      src="https://cdn.vuetifyjs.com/images/cards/cooking.png"
-    />
+    <v-img height="250" :src="trip.imageUrl" />
 
-    <v-card-title>Cafe Badilico</v-card-title>
+    <v-card-title>{{ trip.name }}</v-card-title>
 
     <v-card-text>
       <v-row
@@ -30,19 +27,19 @@
           half-increments
           readonly
           size="14"
-          :value="4.5"
+          :value="trip.rating"
         />
 
         <div class="grey--text ms-4">
-          4.5 (413)
+           {{ trip.rating }} (413)
         </div>
       </v-row>
 
       <div class="my-4 text-subtitle-1">
-        $ • Italian, Cafe
+        {{ trip.type }}
       </div>
 
-      <div>Small plates, salads & sandwiches - an intimate setting with 12 indoor seats plus patio seating.</div>
+      <div>{{ trip.desc }}</div>
     </v-card-text>
 
     <v-divider class="mx-4" />
@@ -76,19 +73,33 @@
     </v-card-actions>
   </v-card>
 </template>
+
+
 <script>
-  export default {
-    data: () => ({
-      loading: false,
-      selection: 1,
-    }),
-
-    methods: {
-      reserve () {
-        this.loading = true
-
-        setTimeout(() => (this.loading = false), 2000)
-      },
-    },
+export default {
+  props: {
+    trip: {
+      type: Object,
+      required: true,
+      default: () => ({
+        imageUrl: 'https://cdn.vuetifyjs.com/images/cards/default.jpg',
+        name: '默认行程',
+        rating: 4.0,
+        type: '$ • 未知类型',
+        desc: '暂无描述'
+      })
+    }
+  },
+  data: () => ({
+    loading: false,
+    selection: 1
+  }),
+  methods: {
+    reserve() {
+      this.loading = true;
+      setTimeout(() => (this.loading = false), 2000);
+    }
   }
+};
 </script>
+
