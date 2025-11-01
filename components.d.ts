@@ -12,6 +12,8 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./src/components/AppFooter.vue')['default']
+    FilterBar: typeof import('./src/components/FilterBar.vue')['default']
+    HandleFilter: typeof import('./src/components/handleFilter.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     NavBar: typeof import('./src/components/NavBar.vue')['default']
     NavLink: typeof import('./src/components/NavLink.vue')['default']

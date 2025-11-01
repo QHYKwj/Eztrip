@@ -1,6 +1,6 @@
 <template>
   <v-card
-    class="trip-card w-100 mx-auto my-12"
+    class="trip-card w-100 mx-auto my-4"
     :loading="loading"
     max-width="600"
   >
@@ -103,3 +103,15 @@ export default {
 };
 </script>
 
+<style scoped>
+.trip-card {
+  border: 1px solid #f7e1ff;
+  border-radius: 8px;
+}
+/* 鼠标悬浮时的效果 */
+.trip-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(157, 113, 164, 0.37); /* 紫色系阴影，呼应主题 */
+  border-color: #d8b4fe;
+}
+</style>
