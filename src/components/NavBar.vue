@@ -38,23 +38,25 @@
       <template #append>
         <NavLink :item="{ title: '消息', icon: 'mdi-bell-badge-outline', to: '/message' }" :mini="mini" />
         <v-divider style="height: 2px;margin-top: 6px"></v-divider>
+        <!-- 修改底部用户信息区域的头像部分 -->
         <v-list-item class="px-4 pb-4 user-info">
-          <div class="avatar-border">
+          <div class="avatar-border" @click="goToProfile"> <!-- 给头像容器加点击事件 -->
             <v-list-item-avatar size="48">
               <v-img
-                class="rounded-circle"
-                src="https://randomuser.me/api/portraits/men/85.jpg"
-              />
-            </v-list-item-avatar>
-          </div>
+          class="rounded-circle"
+          src="https://randomuser.me/api/portraits/men/85.jpg"
+          style="cursor: pointer"
+        />
+    </v-list-item-avatar>
+  </div>
 
-          <v-list-item-title
-            v-if="!mini"
-            class="mt-2 user-name"
-          >
-            John Leider
-          </v-list-item-title>
-        </v-list-item>
+  <v-list-item-title
+    v-if="!mini"
+    class="mt-2 user-name"
+  >
+    John Leider
+  </v-list-item-title>
+</v-list-item>
       </template>
     </v-navigation-drawer>
   </v-card>
@@ -87,10 +89,14 @@
       },
     },
     methods: {
-      toggleMini () {
-        this.mini = !this.mini
-      },
-    },
+  toggleMini () {
+    this.mini = !this.mini
+  },
+  
+  goToProfile () {
+    this.$router.push('/profile') 
+  }
+}
   }
 </script>
 
