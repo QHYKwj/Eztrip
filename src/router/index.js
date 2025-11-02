@@ -14,6 +14,7 @@ import login from '@/pages/login.vue'
 import register from '@/pages/register.vue'
 import forgotPassword from "@/pages/forgot-password.vue";
 import welcomehome from '@/pages/welcomehome.vue'
+import Profile from '@/components/profile.vue'
 const routes = [
   {
     path: '/',
@@ -41,6 +42,11 @@ const routes = [
     path: '/forgot-password',
     component: forgotPassword,
   },
+  {
+      path: '/profile', 
+      name: 'Profile',
+      component: Profile 
+    }
 ]
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
