@@ -14,7 +14,7 @@ import login from '@/pages/login.vue'
 import register from '@/pages/register.vue'
 import forgotPassword from "@/pages/forgot-password.vue";
 import welcomehome from '@/pages/welcomehome.vue'
-import Profile from '@/components/profile.vue'
+import Profile from '@/pages/profile.vue'
 const routes = [
   {
     path: '/',
