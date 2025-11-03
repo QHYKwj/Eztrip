@@ -15,6 +15,7 @@ import register from '@/pages/register.vue'
 import forgotPassword from "@/pages/forgot-password.vue";
 import welcomehome from '@/pages/welcomehome.vue'
 import Profile from '@/pages/profile.vue'
+import Message from '@/pages/message.vue';
 const routes = [
   {
     path: '/',
@@ -46,7 +47,12 @@ const routes = [
       path: '/profile', 
       name: 'Profile',
       component: Profile 
-    }
+    },
+  {
+      path: '/message',
+      name: 'Message',
+      component: Message
+    },
 ]
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
