@@ -24,7 +24,7 @@
 
       <!-- 主菜单 -->
       <v-list dense>
-        <NavLink :item="{ title: '创建', icon: 'mdi-plus-circle', to: '/hello' }" :mini="mini" />
+        <NavLink :item="{ title: '创建', icon: 'mdi-plus-circle',  onClick: () => this.$emit('showCreateDialog')  }" :mini="mini" />
         <v-divider style="height: 2px;margin-top: 6px"></v-divider>
         <NavTitle :item="{ heading: 'Main Menu' }" :mini="mini" />
         <NavLink :item="{ title: '首页', icon: 'mdi-home', to: '/home' }" :mini="mini" />
@@ -77,6 +77,7 @@
         required: true,
       },
     },
+    emits: ['showCreateDialog'],
     data () {
       return {
         localdrawer: this.drawer,
@@ -92,10 +93,11 @@
   toggleMini () {
     this.mini = !this.mini
   },
-  
+
   goToProfile () {
-    this.$router.push('/profile') 
+    this.$router.push('/profile')
   }
+
 }
   }
 </script>
@@ -141,6 +143,12 @@
   align-items: center;
   justify-content: center;
   transition: transform 0.2s ease;
+}
+.message-section {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  /* 根据需要调整消息部分的样式 */
 }
 
 .menu-toggle-btn {

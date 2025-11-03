@@ -8,13 +8,14 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router'
 import hello from '@/components/HelloWorld.vue'
+import Profile from '@/components/profile.vue'
 // import { routes } from 'vue-router/auto-routes'
 import defaultlayout from '@/layouts/default.vue'
+import CreateTripPage from '@/pages/CreateTripPage.vue'
+import forgotPassword from '@/pages/forgot-password.vue'
 import login from '@/pages/login.vue'
 import register from '@/pages/register.vue'
-import forgotPassword from "@/pages/forgot-password.vue";
 import welcomehome from '@/pages/welcomehome.vue'
-import Profile from '@/components/profile.vue'
 const routes = [
   {
     path: '/',
@@ -43,10 +44,15 @@ const routes = [
     component: forgotPassword,
   },
   {
-      path: '/profile', 
-      name: 'Profile',
-      component: Profile 
-    }
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+  },
+  {
+    path: '/create-trip',
+    name: 'CreateTrip',
+    component: CreateTripPage,
+  },
 ]
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

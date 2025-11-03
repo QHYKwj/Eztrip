@@ -3,7 +3,7 @@
     class="nav-link"
     :class="{ active: isActive }"
     link
-    @click="goTo(item.to)"
+    @click="handleClick"
   >
     <v-list-item-content>
       <div class="nav-link-content" :class="{ mini: mini }">
@@ -37,13 +37,18 @@
     computed: {
       isActive () {
         // 根据当前路由是否匹配判断高亮
-        return this.$route.path === this.item.to
+        return this.item.to ? this.$route.path === this.item.to : false;
       },
     },
     methods: {
-      goTo (route) {
-        if (route && this.$route.path !== route) {
-          this.$router.push(route)
+      handleClick () {
+        // 1. 如果有 to 路由，则执行跳转（保留原有逻辑）
+        if (this.item.to && this.$route.path !== this.item.to) {
+          this.$router.push(this.item.to);
+        }
+        // 2. 如果有 onClick 回调，则执行回调（新增逻辑）
+        if (this.item.onClick) {
+          this.item.onClick();
         }
       },
     },
