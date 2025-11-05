@@ -77,7 +77,7 @@
         if (this.$refs.form.validate()) {
           if (this.email === '123@qq.com' && this.password === '123') {
             // 登录成功后跳转
-            this.$router.push('/')// 跳转到目标路由
+            this.$router.push('/main')// 跳转到目标路由
           } else {
             alert('用户名或密码错误')
           }

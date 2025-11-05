@@ -8,19 +8,23 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router'
 import hello from '@/components/HelloWorld.vue'
-// import { routes } from 'vue-router/auto-routes'
 import defaultlayout from '@/layouts/default.vue'
+// import { routes } from 'vue-router/auto-routes'
+import init from '@/layouts/init.vue'
 import CreateTripPage from '@/pages/CreateTripPage.vue'
 import forgotPassword from '@/pages/forgot-password.vue'
 import login from '@/pages/login.vue'
-import register from '@/pages/register.vue'
-import forgotPassword from "@/pages/forgot-password.vue";
-import welcomehome from '@/pages/welcomehome.vue'
+import Message from '@/pages/message.vue'
 import Profile from '@/pages/profile.vue'
-import Message from '@/pages/message.vue';
+import register from '@/pages/register.vue'
+import welcomehome from '@/pages/welcomehome.vue'
 const routes = [
   {
     path: '/',
+    component: init,
+  },
+  {
+    path: '/main',
     component: defaultlayout,
     children: [
       {
@@ -56,10 +60,10 @@ const routes = [
     component: CreateTripPage,
   },
   {
-      path: '/message',
-      name: 'Message',
-      component: Message
-    },
+    path: '/message',
+    name: 'Message',
+    component: Message,
+  },
 ]
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
