@@ -17,15 +17,15 @@
         <v-btn class="menu-toggle-btn" icon @click="toggleMini">
           <v-icon>{{ mini ? 'mdi-menu-close' : 'mdi-menu-open' }}</v-icon>
         </v-btn>
-<!--        <v-list-item-title v-if="!mini" class="ml-2" style="color: black;position: relative;left: 32%">菜单</v-list-item-title>-->
+        <!--        <v-list-item-title v-if="!mini" class="ml-2" style="color: black;position: relative;left: 32%">菜单</v-list-item-title>-->
       </v-list-item>
 
       <v-divider />
 
       <!-- 主菜单 -->
       <v-list dense>
-        <NavLink :item="{ title: '创建', icon: 'mdi-plus-circle',  onClick: () => this.$emit('showCreateDialog')  }" :mini="mini" />
-        <v-divider style="height: 2px;margin-top: 6px"></v-divider>
+        <NavLink :item="{ title: '创建', icon: 'mdi-plus-circle', onClick: () => $emit('showCreateDialog') }" :mini="mini" />
+        <v-divider style="height: 2px;margin-top: 6px" />
         <NavTitle :item="{ heading: 'Main Menu' }" :mini="mini" />
         <NavLink :item="{ title: '首页', icon: 'mdi-home', to: '/home' }" :mini="mini" />
         <NavLink :item="{ title: '行程', icon: 'mdi-content-save', to: '/trip' }" :mini="mini" />
@@ -37,26 +37,26 @@
       <!-- 头像固定在底部 -->
       <template #append>
         <NavLink :item="{ title: '消息', icon: 'mdi-bell-badge-outline', to: '/message' }" :mini="mini" />
-        <v-divider style="height: 2px;margin-top: 6px"></v-divider>
+        <v-divider style="height: 2px;margin-top: 6px" />
         <!-- 修改底部用户信息区域的头像部分 -->
         <v-list-item class="px-4 pb-4 user-info">
           <div class="avatar-border" @click="goToProfile"> <!-- 给头像容器加点击事件 -->
             <v-list-item-avatar size="48">
               <v-img
-          class="rounded-circle"
-          src="https://randomuser.me/api/portraits/men/85.jpg"
-          style="cursor: pointer"
-        />
-    </v-list-item-avatar>
-  </div>
+                class="rounded-circle"
+                src="https://randomuser.me/api/portraits/men/85.jpg"
+                style="cursor: pointer"
+              />
+            </v-list-item-avatar>
+          </div>
 
-  <v-list-item-title
-    v-if="!mini"
-    class="mt-2 user-name"
-  >
-    John Leider
-  </v-list-item-title>
-</v-list-item>
+          <v-list-item-title
+            v-if="!mini"
+            class="mt-2 user-name"
+          >
+            John Leider
+          </v-list-item-title>
+        </v-list-item>
       </template>
     </v-navigation-drawer>
   </v-card>
@@ -90,15 +90,15 @@
       },
     },
     methods: {
-  toggleMini () {
-    this.mini = !this.mini
-  },
+      toggleMini () {
+        this.mini = !this.mini
+      },
 
-  goToProfile () {
-    this.$router.push('/profile')
-  }
+      goToProfile () {
+        this.$router.push('/profile')
+      },
 
-}
+    },
   }
 </script>
 
