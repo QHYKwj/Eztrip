@@ -28,7 +28,7 @@
         <v-divider style="height: 2px;margin-top: 6px" />
         <NavTitle :item="{ heading: 'Main Menu' }" :mini="mini" />
         <NavLink :item="{ title: '首页', icon: 'mdi-home', to: '/home' }" :mini="mini" />
-        <NavLink :item="{ title: '行程', icon: 'mdi-content-save', to: '/trip' }" :mini="mini" />
+        <NavLink :item="{ title: '行程', icon: 'mdi-content-save', to: '/plan' }" :mini="mini" />
 
         <NavTitle :item="{ heading: 'Dev Tools' }" :mini="mini" />
         <NavLink :item="{ title: 'AI生成', icon: 'mdi-creation', to: '/AI' }" :mini="mini" />

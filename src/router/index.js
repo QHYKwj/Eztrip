@@ -19,6 +19,7 @@ import Profile from '@/pages/profile.vue'
 import register from '@/pages/register.vue'
 import welcomehome from '@/pages/welcomehome.vue'
 import AI from '@/pages/AI.vue'
+import plan from '@/pages/plan.vue'
 const routes = [
   {
     path: '/',
@@ -40,6 +41,11 @@ const routes = [
         path: '/AI', 
         name: 'AI', 
         component: AI 
+      },
+      { 
+        path: '/plan', 
+        name: 'plan', 
+        component: plan
       },
     ],
   },
