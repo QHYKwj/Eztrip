@@ -22,14 +22,18 @@
         <SwiperCard />
       </v-card>
 
-      <!-- 行程卡片：一行3个 -->
-      <v-row gutter="20">
-        <template v-for="(group, groupIndex) in tripGroups" :key="groupIndex">
-          <v-col v-for="(trip, index) in group" :key="index" :span="8">
-            <TripCard v-if="trip.id" :trip="trip" />
-            <div v-else class="empty-card" />
-          </v-col>
-        </template>
+      <!-- 行程卡片：响应式排列 -->
+      <v-row gutter="20" class="trip-row">
+        <!-- 桌面lg：每行8个 (24/3=8) -->
+        <v-col 
+          v-for="(trip, index) in filteredTrips" 
+          :key="trip.id || index" 
+          :cols="12"   
+          :md="8"      
+          :lg="3"    
+        >
+          <TripCard :trip="trip" />
+        </v-col>
       </v-row>
     </v-container>
   </v-main>
@@ -37,7 +41,7 @@
 
 <script setup>
   import { computed, ref } from 'vue'
-  import CreateTripDialog from '@/components/CreateTripDialog.vue'
+  import CreateTripDialog from '@/components/createTripDialog.vue'
   import FilterBar from '@/components/FilterBar.vue'
   import SearchBar from '@/components/SearchBar.vue'
   import SwiperCard from '@/components/SwiperCard.vue'
@@ -67,17 +71,14 @@
   function handleTripFilter (filters) {
     const { time, location, style } = filters
     filteredTrips.value = originalTrips.value.filter(trip => {
-      // 时间筛选（支持范围）
+      // 时间筛选
       if (time) {
         const tripTime = trip.time
-        // 处理4-7天和7+的范围匹配
         if (time === '4-7') {
-          // 匹配时间为4-7天的行程（这里假设trip.time是'4-7'或具体数字）
           if (!['4', '5', '6', '7', '4-7'].includes(tripTime)) return false
         } else if (time === '7+') {
           if (!['7+', '8', '9'].includes(tripTime)) return false
         } else {
-          // 1-3天精确匹配
           if (tripTime !== time) return false
         }
       }
@@ -91,19 +92,6 @@
       return true
     })
   }
-
-  // 分组逻辑（保持不变）
-  function groupTrips (list) {
-    const groups = []
-    for (let i = 0; i < list.length; i += 3) {
-      const group = list.slice(i, i + 3)
-      while (group.length < 3) group.push({})
-      groups.push(group)
-    }
-    return groups
-  }
-
-  const tripGroups = computed(() => groupTrips(filteredTrips.value))
 </script>
 
 <style scoped>
@@ -132,17 +120,13 @@
 }
 
 /* 行程卡片 */
-.empty-card {
-  width: 100%;
-  min-height: 400px; /* 与TripCard高度一致 */
-  border: 1px solid #eee;
-  border-radius: 4px;
-  box-sizing: border-box;
+.trip-row {
+  padding: 0 16px;
+  margin-bottom: 20px;
 }
-:deep(.trip-card) {
-  width: 100%;
-}
+
 :deep(.v-col) {
-  padding: 0 8px;
+  padding: 0 10px;
+  margin-bottom: 20px; /* 卡片之间的垂直间距 */
 }
 </style>

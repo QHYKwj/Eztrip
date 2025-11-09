@@ -107,11 +107,28 @@ export default {
 .trip-card {
   border: 1px solid #f7e1ff;
   border-radius: 8px;
+  height: 100%; /* 确保卡片高度一致 */
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease; /* 平滑过渡效果 */
 }
-/* 鼠标悬浮时的效果 */
+
+/* 鼠标悬浮效果优化 */
 .trip-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(157, 113, 164, 0.37); /* 紫色系阴影，呼应主题 */
+  box-shadow: 0 8px 20px rgba(157, 113, 164, 0.37);
   border-color: #d8b4fe;
+}
+
+/* 卡片内容区域自动填充空间 */
+:deep(.v-card-text) {
+  flex-grow: 1;
+}
+
+/* 调整图片样式 */
+:deep(.v-img) {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  object-fit: cover; /* 图片自适应裁剪 */
 }
 </style>
