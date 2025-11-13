@@ -47,11 +47,10 @@
 </template>
 
 <script>
-  import API from '@/config/api'
+  import axios from 'axios'
+
   export default {
     data: () => ({
-      currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
-      ws: null,
       valid: true,
       email: '',
       emailRules: [
@@ -62,7 +61,6 @@
       passwordRules: [
         v => !!v || 'Password is required',
       ],
-      checkbox: false,
     }),
     computed: {
       emailErrors () {
@@ -74,15 +72,32 @@
     },
     methods: {
       async login () {
-        if (this.$refs.form.validate()) {
-          if (this.email === '123@qq.com' && this.password === '123') {
-            // 登录成功后跳转
-            this.$router.push('/home')// 跳转到目标路由
-          } else {
-            alert('用户名或密码错误')
-          }
-        } else {
+        // 表单验证
+        if (!this.$refs.form.validate()) {
           alert('请检查输入是否正确')
+          return
+        }
+
+        try {
+          // 调用后端 API
+          const formData = new FormData()
+          formData.append('username', this.email) // FastAPI 参数名为 username
+          formData.append('password', this.password) // FastAPI 参数名为 password
+
+          const res = await axios.post('/api/login', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+
+          // 登录成功
+          console.log(res.data)
+          alert(res.data.message || '登录成功')
+          this.$router.push('/home')
+        } catch (error) {
+          if (error.response && error.response.status === 401) {
+            alert('用户名或密码错误')
+          } else {
+            alert('登录失败，请检查网络或服务器')
+          }
         }
       },
     },

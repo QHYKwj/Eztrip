@@ -1,8 +1,8 @@
 // API配置文件
 
 // 从环境变量获取基础URL
-const API_BASE_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:8082';
-const WS_BASE_URL = import.meta.env.VITE_APP_WS_BASE_URL || 'ws://localhost:8082';
+const API_BASE_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:8000';
+const WS_BASE_URL = import.meta.env.VITE_APP_WS_BASE_URL || 'ws://localhost:8000';
 
 // API端点
 const API = {

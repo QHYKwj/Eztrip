@@ -76,5 +76,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    open: true, // 启动时自动打开浏览器（可选）
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000', // 👈 FastAPI 后端地址
+        changeOrigin: true,
+      },
+    },
   },
 })
