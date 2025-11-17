@@ -2,7 +2,7 @@
 
 ## 环境要求
 
-- Python 3.8+
+- Python 3.8+ (win+r->cmd->python --version)
 - 依赖库请参考 `requirements.txt`
 
 ## 安装
@@ -18,13 +18,17 @@
    ```bash
    pip install -r requirements.txt
    ```
-
+   // MySQL Connector
+   pip install mysql-connector-python
 ## 配置
 
 项目配置文件位于 `settings.py`，可根据需要修改以下内容：
 
 - `SERVER_HOST`：服务运行的主机地址。
 - `SERVER_PORT`：服务运行的端口。
+
+数据库配置位于'setting.json'
+
 ## 运行
 
 启动后端：
