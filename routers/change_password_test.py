@@ -1,11 +1,10 @@
 import requests
 
-url = "http://127.0.0.1:8000/api/register/register"
+url = "http://127.0.0.1:8000/api/change_password/change_password"
 data = {
-    "username": "zhang4",
-    "email": "zhanghz3@mail2.sysu.edu.cn",
-    "password": "050129",
-    "confirm_password": "050129",
+    "username": "zhang3",
+    "email": "zhanghz3@mail.sysu.edu.cn",
+    "new_password": "051102"
 }
 
 # 发送 POST 请求

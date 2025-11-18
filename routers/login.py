@@ -45,7 +45,12 @@ async def login(username: str = Form(...), password: str = Form(...)):
         # 重新抛出已知的HTTP异常
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error")
+        if db_conn:
+            db_conn.rollback()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"登录失败: {str(e)}"
+        )  
     finally:
         # 确保资源被正确释放
         if cursor:

@@ -10,11 +10,13 @@ from config.connect_db import connect_db
 # 导入路由
 from routers import login
 from routers import register
+from routers import change_password
 app = FastAPI(title="FastAPI Login Example")
 
 # 注册登录路由
 app.include_router(login.router)
 app.include_router(register.register_router)
+app.include_router(change_password.router)
 
 # 使用示例
 if __name__ == "__main__":
