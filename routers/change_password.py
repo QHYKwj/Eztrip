@@ -3,7 +3,7 @@ from fastapi import APIRouter, Form, HTTPException, Depends
 from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/change_password", tags=["change_password"])
-@router.post("/change_password")
+@router.post("")
 async def change_password(username: str = Form(...), email: str = Form() , new_password: str = Form(...)):
     db_conn = None
     cursor = None
