@@ -11,14 +11,17 @@
               <img alt="Logo" class="logo" src="@/assets/logo2.svg">
               <v-card-text>
                 <v-form ref="form" v-model="valid" lazy-validation>
+                  <!-- 修改部分开始：将 Email 改为 Username -->
                   <v-text-field
-                    v-model="email"
-                    :error-messages="emailErrors"
-                    label="Email"
+                    v-model="username"
+                    :error-messages="usernameErrors"
+                    label="Username"
                     required
-                    :rules="emailRules"
-                    type="email"
+                    :rules="usernameRules"
+                    type="text"
                   />
+                  <!-- 修改部分结束 -->
+
                   <v-text-field
                     v-model="password"
                     :error-messages="passwordErrors"
@@ -47,65 +50,69 @@
 </template>
 
 <script>
-  import axios from 'axios'
+import axios from 'axios'
 
-  export default {
-    data: () => ({
-      valid: true,
-      email: '',
-      emailRules: [
-        v => !!v || 'E-mail is required',
-        v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
-      ],
-      password: '',
-      passwordRules: [
-        v => !!v || 'Password is required',
-      ],
-    }),
-    computed: {
-      emailErrors () {
-        return this.emailRules.filter(rule => !rule(this.email)).map(rule => rule(this.email))
-      },
-      passwordErrors () {
-        return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
-      },
+export default {
+  data: () => ({
+    valid: true,
+    // 修改部分：将 email 改为 username
+    username: '',
+    usernameRules: [
+      v => !!v || 'Username is required', // 只保留非空校验，去掉了邮箱格式正则
+    ],
+    password: '',
+    passwordRules: [
+      v => !!v || 'Password is required',
+    ],
+  }),
+  computed: {
+    // 修改部分：计算属性对应 username
+    usernameErrors () {
+      return this.usernameRules.filter(rule => !rule(this.username)).map(rule => rule(this.username))
     },
-    methods: {
-      async login () {
-        // 表单验证
-        if (!this.$refs.form.validate()) {
-          alert('请检查输入是否正确')
-          return
-        }
-
-        try {
-          // 调用后端 API
-          const formData = new FormData()
-          formData.append('username', this.email) // FastAPI 参数名为 username
-          formData.append('password', this.password) // FastAPI 参数名为 password
-
-          const res = await axios.post('/api/login', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-
-          // 登录成功
-          console.log(res.data)
-          alert(res.data.message || '登录成功')
-          this.$router.push('/home')
-        } catch (error) {
-          if (error.response && error.response.status === 401) {
-            alert('用户名或密码错误')
-          } else {
-            alert('登录失败，请检查网络或服务器')
-          }
-        }
-      },
+    passwordErrors () {
+      return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
     },
-  }
+  },
+  methods: {
+    async login () {
+      // 表单验证
+      if (!this.$refs.form.validate()) {
+        alert('请检查输入是否正确')
+        return
+      }
+
+      try {
+        // 调用后端 API
+        const formData = new FormData()
+        // 修改部分：使用 this.username
+        formData.append('username', this.username)
+        formData.append('password', this.password)
+
+        const res = await axios.post('/api/login', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+
+        // 登录成功
+        console.log(res.data)
+        alert(res.data.message || '登录成功')
+        this.$router.push('/home')
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          // 提示信息也稍微改得更准确一点
+          alert('登录失败：用户名或密码错误')
+        } else {
+          console.error(error)
+          alert('登录失败，请检查网络或服务器')
+        }
+      }
+    },
+  },
+}
 </script>
 
 <style scoped>
-/* 背景部分 */
+/* 背景部分保持不变 */
 html, body {
   height: 100%;
   margin: 0;
@@ -163,16 +170,15 @@ html, body {
 }
 
 .background2 {
-  position: absolute; /* 确保它覆盖在 background 上 */
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8),rgba(70, 130, 180, 0.8)); /* 蓝紫渐变色 */
-  z-index: 2; /* 在背景和内容之间 */
+  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8),rgba(70, 130, 180, 0.8));
+  z-index: 2;
 }
 
-/* 让登录框居中并变成正方形 */
 .content {
   position: relative;
   z-index: 3;
@@ -184,10 +190,10 @@ html, body {
   margin: 0 auto;
   padding: 30px;
   border-radius: 15px;
-  background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
-  flex-direction: column; /* 垂直排列元素 */
-  align-items: center; /* 水平居中对齐 */
-  justify-content: center; /* 垂直居中对齐 */
+  background-color: rgba(255, 255, 255, 0.8);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .logo {
@@ -201,7 +207,6 @@ html, body {
   height: 100vh;
 }
 
-/* 其他样式 */
 .v-btn {
   width: 100%;
   margin-bottom: 10px;

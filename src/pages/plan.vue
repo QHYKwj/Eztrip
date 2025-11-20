@@ -15,9 +15,9 @@
         <div class="section-header">
           <div class="title-with-btn">
             <h2 class="section-title">我的行程</h2>
-            <v-btn 
-              icon 
+            <v-btn
               class="toggle-btn"
+              icon
               @click="myTripsExpanded = !myTripsExpanded"
             >
               <v-icon>
@@ -28,21 +28,21 @@
         </div>
 
         <!-- 行程列表 -->
-        <v-row 
-          gutter="20" 
-          class="trip-row"
+        <v-row
           v-if="myTripsExpanded"
+          class="trip-row"
+          gutter="20"
         >
-          <v-col 
-            v-for="(trip, index) in myTrips" 
-            :key="trip.id || index" 
-            :cols="12"   
-            :md="8"      
-            :lg="3"    
+          <v-col
+            v-for="(trip, index) in myTrips"
+            :key="trip.id || index"
+            :cols="12"
+            :lg="3"
+            :md="8"
           >
             <TripCard :trip="trip" />
           </v-col>
-          <v-col v-if="myTrips.length === 0" :cols="12" class="no-trip">
+          <v-col v-if="myTrips.length === 0" class="no-trip" :cols="12">
             暂无我的行程
           </v-col>
         </v-row>
@@ -53,9 +53,9 @@
         <div class="section-header">
           <div class="title-with-btn">
             <h2 class="section-title">收藏的行程</h2>
-            <v-btn 
-              icon 
+            <v-btn
               class="toggle-btn"
+              icon
               @click="favoriteTripsExpanded = !favoriteTripsExpanded"
             >
               <v-icon>
@@ -66,21 +66,21 @@
         </div>
 
         <!-- 行程列表 -->
-        <v-row 
-          gutter="20" 
-          class="trip-row"
+        <v-row
           v-if="favoriteTripsExpanded"
+          class="trip-row"
+          gutter="20"
         >
-          <v-col 
-            v-for="(trip, index) in favoriteTrips" 
-            :key="trip.id || index" 
-            :cols="12"   
-            :md="8"      
-            :lg="3"    
+          <v-col
+            v-for="(trip, index) in favoriteTrips"
+            :key="trip.id || index"
+            :cols="12"
+            :lg="3"
+            :md="8"
           >
             <TripCard :trip="trip" />
           </v-col>
-          <v-col v-if="favoriteTrips.length === 0" :cols="12" class="no-trip">
+          <v-col v-if="favoriteTrips.length === 0" class="no-trip" :cols="12">
             暂无收藏的行程
           </v-col>
         </v-row>
@@ -91,26 +91,30 @@
 
 <script setup>
 // 逻辑部分与之前一致，此处省略（保持不变）
-import { computed, ref } from 'vue'
-import SearchBar from '@/components/SearchBar.vue'
-import TripCard from '@/components/TripCard.vue'
+  import { computed, ref } from 'vue'
+  import SearchBar from '@/components/SearchBar.vue'
+  import TripCard from '@/components/TripCard.vue'
 
-const myTripsExpanded = ref(true)
-const favoriteTripsExpanded = ref(true)
+  const myTripsExpanded = ref(true)
+  const favoriteTripsExpanded = ref(true)
 
-function handleSearch(query) { console.log('搜索:', query) }
-function handleInput(value) { console.log('输入:', value) }
+  function handleSearch (query) {
+    console.log('搜索:', query)
+  }
+  function handleInput (value) {
+    console.log('输入:', value)
+  }
 
-const originalTrips = ref([
-  { id: 1, name: '我的行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-  { id: 2, name: '我的行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-  { id: 3, name: '收藏行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
-  { id: 4, name: '我的行程3', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-  { id: 5, name: '收藏行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
-])
+  const originalTrips = ref([
+    { id: 1, name: '我的行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
+    { id: 2, name: '我的行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
+    { id: 3, name: '收藏行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
+    { id: 4, name: '我的行程3', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
+    { id: 5, name: '收藏行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
+  ])
 
-const myTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'my'))
-const favoriteTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'favorite'))
+  const myTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'my'))
+  const favoriteTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'favorite'))
 </script>
 
 <style scoped>
