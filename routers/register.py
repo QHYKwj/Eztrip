@@ -2,15 +2,15 @@
 from fastapi import APIRouter, Form, HTTPException
 from config.connect_db import connect_db
 
-register_router = APIRouter(prefix="/api/register", tags=["register"])
+router = APIRouter(prefix="/api/register", tags=["register"])
 
 # 设置路由标识
-@register_router.post("")
+@router.post("")
 async def register(username: str = Form(...), email: str = Form(...), password: str = Form(...), confirm_password: str = Form(...)):
     db_conn = None
     cursor = None
     try:
-        # 1.验证输入参数
+        # 1.验证输入参数是否全不为空
         if not all([username.strip(), email.strip(), password.strip(), confirm_password.strip()]):
             raise HTTPException(
                 status_code = 400,

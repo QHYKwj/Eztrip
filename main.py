@@ -11,12 +11,14 @@ from config.connect_db import connect_db
 from routers import login
 from routers import register
 from routers import change_password
+from routers import finduser
 app = FastAPI(title="FastAPI Login Example")
 
 # 注册登录路由
 app.include_router(login.router)
-app.include_router(register.register_router)
+app.include_router(register.router)
 app.include_router(change_password.router)
+app.include_router(finduser.router)
 
 # 使用示例
 if __name__ == "__main__":

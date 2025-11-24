@@ -3,7 +3,7 @@
         "host": "localhost",
         "database": "eztrip",
         "user": "root",
-        "password": "050409Yy",
+        "password": "050129",
         "port": 3306,
         "charset": "utf8mb4"
     }

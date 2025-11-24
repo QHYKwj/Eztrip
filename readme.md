@@ -17,8 +17,9 @@
 2. 安装依赖：
    ```bash
    pip install -r requirements.txt
+   pip install python-multipart
    ```
-   // MySQL Connector
+   // MySQL Connector<br>
    pip install mysql-connector-python
 ## 配置
 
@@ -27,7 +28,8 @@
 - `SERVER_HOST`：服务运行的主机地址。
 - `SERVER_PORT`：服务运行的端口。
 
-数据库配置位于'setting.json'
+数据库配置位于<br>
+'setting.json'
 
 ## 运行
 
@@ -36,6 +38,7 @@
 ```shell
 python main.py
 ```
+每次修改记得先删除venv文件夹，再安装虚拟环境<br>
 
 ## 测试
 后端测试在对应的url后+/docs即可测试
