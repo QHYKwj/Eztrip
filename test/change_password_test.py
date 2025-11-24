@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:8000/api/change_password/change_password"
+url = "http://127.0.0.1:8000/api/change_password"
 data = {
     "username": "zhang3",
     "email": "zhanghz3@mail.sysu.edu.cn",

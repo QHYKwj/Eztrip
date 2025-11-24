@@ -1,11 +1,9 @@
 import requests
 
-url = "http://127.0.0.1:8000/api/register"
+url = "http://127.0.0.1:8000/api/collect_trip"
 data = {
-    "username": "zhang4",
-    "email": "zhanghz3@mail2.sysu.edu.cn",
-    "password": "050129",
-    "confirm_password": "050129",
+    "user_id": 4,
+    "trip_id": 2
 }
 
 # 发送 POST 请求

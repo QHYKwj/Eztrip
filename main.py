@@ -12,6 +12,8 @@ from routers import login
 from routers import register
 from routers import change_password
 from routers import finduser
+from routers import create_trip
+from routers import collect_trip
 app = FastAPI(title="FastAPI Login Example")
 
 # 注册登录路由
@@ -19,7 +21,8 @@ app.include_router(login.router)
 app.include_router(register.router)
 app.include_router(change_password.router)
 app.include_router(finduser.router)
-
+app.include_router(create_trip.router)
+app.include_router(collect_trip.router)
 # 使用示例
 if __name__ == "__main__":
     db_conn = connect_db()

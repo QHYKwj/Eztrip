@@ -1,6 +1,6 @@
 import requests
 
-url = "http://127.0.0.1:8000/api/login/login"
+url = "http://127.0.0.1:8000/api/login"
 data = {
     "username": "zhang",
     "password": "051102"

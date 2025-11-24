@@ -1,11 +1,8 @@
 import requests
 
-url = "http://127.0.0.1:8000/api/register"
+url = "http://127.0.0.1:8000/api/finduser"
 data = {
-    "username": "zhang4",
-    "email": "zhanghz3@mail2.sysu.edu.cn",
-    "password": "050129",
-    "confirm_password": "050129",
+    "username":"zhang"
 }
 
 # 发送 POST 请求

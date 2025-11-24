@@ -23,15 +23,25 @@ async def change_password(username: str = Form(...), email: str = Form() , new_p
                 detail = "Failed to connect database"
             )
         
-        # 3.更新数据库
         cursor = db_conn.cursor()
-        update_query = "UPDATE user_info SET password = %s WHERE username = %s and email = %s;"
-        cursor.execute(update_query, (new_password, username, email,))
 
+        # 3.检查用户名和邮箱是否正确
+        select_query = "SELECT * FROM user_info WHERE username = %s and email = %s;"
+        cursor.execute(select_query, (new_password, username, email,))
+
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code = 404,
+                detail = "Username or email wrong"
+            )
+        
+        # 4.更新数据库修改用户密码
+        update_query = "UPDATE user_info SET password = %s WHERE username = %s and email = %s"
+        cursor.execute(update_query, (new_password, username, email))
         if cursor.rowcount == 0:
             raise HTTPException(
                 status_code=400, 
-                detail="Username or email wrong"
+                detail="Change password unsuccessful"
             )
         
         db_conn.commit()

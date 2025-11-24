@@ -3,7 +3,6 @@ from fastapi import APIRouter, Form, HTTPException
 from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/finduser", tags=["finduser"])
-
 @router.post("")
 async def find_user(username: str = Form(...)):
     db_conn = None
@@ -28,8 +27,8 @@ async def find_user(username: str = Form(...)):
         cursor = db_conn.cursor(dictionary="true")
 
         # 3.查询用户信息
-        query = "SELECT username,avatar,email FROM user_info WHERE username LIKE %s ;"
-        cursor.execute(query, (username+'%',))
+        query = "SELECT username,avatar,email FROM user_info WHERE username = %s ;"
+        cursor.execute(query, (username,))
         user = cursor.fetchone()
         
         if not user:
@@ -37,7 +36,6 @@ async def find_user(username: str = Form(...)):
                 status_code=404,
                 detail="User not found"
             )
-        db_conn.commit()
         # 4.返回用户信息
         return {"message": "User found", "user": user}
         

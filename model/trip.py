@@ -1,6 +1,7 @@
 # 行程
 class Trip:
     def __init__(self):
+        self.user_id = None 
         self.trip_id = None
         self.trip_name = None
         self.destination = None
