@@ -8,9 +8,12 @@
 账号、密码是否符合格式（不为空）
 账号是否已存在
 注册成功
-修改密码：ChangePassword()
+
+修改密码：ChangePassword()<br>
 查找用户：FindUser()
+根据用户名查找
 删除用户：DeleteUser()
+只有管理员可以删除用户
 
 发送信息：SendMessage()
 
