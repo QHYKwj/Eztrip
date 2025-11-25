@@ -1,0 +1,40 @@
+# Byte编译的Python文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+env/
+
+# IDE相关文件
+.idea/
+.vscode/
+*.swp
+
+# 日志文件
+*.log
+
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db
+
+# 环境配置文件
+*.env
+
+# 打包相关文件
+*.egg-info/
+dist/
+build/
+
+# 测试覆盖率文件
+.coverage
+htmlcov/
+
+# Jupyter Notebook检查点
+.ipynb_checkpoints/
+
+# 临时文件
+*.tmp
+*.bak
+*.old
