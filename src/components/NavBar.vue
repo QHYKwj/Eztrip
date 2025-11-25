@@ -36,7 +36,16 @@
 
       <!-- 头像固定在底部 -->
       <template #append>
-        <NavLink :item="{ title: '消息', icon: 'mdi-bell-badge-outline', to: '/message' }" :mini="mini" />
+        <!-- 消息入口：根据未读数决定是否显示徽章 -->
+        <NavLink
+          :item="{
+            title: '消息',
+            icon: 'mdi-bell-badge-outline',
+            to: '/message',
+            showBadge: hasUnread
+          }"
+          :mini="mini"
+        />
         <v-divider style="height: 2px;margin-top: 6px" />
         <!-- 修改底部用户信息区域的头像部分 -->
         <v-list-item class="px-4 pb-4 user-info">
@@ -63,10 +72,12 @@
 </template>
 
 <script>
+  import { notificationState } from '@/stores/notificationState'
   import NavLink from './NavLink.vue'
   import NavTitle from './NavTitle.vue'
 
   export default {
+    name: 'SideNav',
     components: {
       NavLink,
       NavTitle,
@@ -82,7 +93,13 @@
       return {
         localdrawer: this.drawer,
         mini: true,
+        notificationState,
       }
+    },
+    computed: {
+      hasUnread () {
+        return this.notificationState.unreadCount > 0
+      },
     },
     watch: {
       drawer (newVal) {
@@ -93,11 +110,9 @@
       toggleMini () {
         this.mini = !this.mini
       },
-
       goToProfile () {
         this.$router.push('/profile')
       },
-
     },
   }
 </script>

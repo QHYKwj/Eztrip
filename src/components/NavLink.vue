@@ -5,19 +5,37 @@
     link
     @click="handleClick"
   >
-    <v-list-item-content>
-      <div class="nav-link-content" :class="{ mini: mini }">
+    <div class="nav-link-content" :class="{ mini: mini }">
+      <!-- 有 showBadge 时加徽章 -->
+      <v-badge
+        v-if="item.showBadge"
+        class="mr-2"
+        color="error"
+        dot
+        offset-x="4"
+        offset-y="4"
+      >
         <v-icon
           class="nav-link-icon"
           :class="{ mini: mini, active: isActive }"
         >
           {{ item.icon }}
         </v-icon>
-        <span v-if="!mini" class="nav-link-text">
-          <slot>{{ item.title }}</slot>
-        </span>
-      </div>
-    </v-list-item-content>
+      </v-badge>
+
+      <!-- 无徽章时正常图标 -->
+      <v-icon
+        v-else
+        class="nav-link-icon"
+        :class="{ mini: mini, active: isActive }"
+      >
+        {{ item.icon }}
+      </v-icon>
+
+      <span v-if="!mini" class="nav-link-text">
+        <slot>{{ item.title }}</slot>
+      </span>
+    </div>
   </v-list-item>
 </template>
 
@@ -36,19 +54,16 @@
     },
     computed: {
       isActive () {
-        // 根据当前路由是否匹配判断高亮
-        return this.item.to ? this.$route.path === this.item.to : false;
+        return this.item.to ? this.$route.path === this.item.to : false
       },
     },
     methods: {
       handleClick () {
-        // 1. 如果有 to 路由，则执行跳转（保留原有逻辑）
         if (this.item.to && this.$route.path !== this.item.to) {
-          this.$router.push(this.item.to);
+          this.$router.push(this.item.to)
         }
-        // 2. 如果有 onClick 回调，则执行回调（新增逻辑）
         if (this.item.onClick) {
-          this.item.onClick();
+          this.item.onClick()
         }
       },
     },
@@ -87,7 +102,7 @@
 
 /* 收起时 icon 居中 */
 .nav-link-icon.mini {
-  margin:0 auto;
+  margin: 0 auto;
   font-size: 28px;
   width: 100%;
   text-align: center;

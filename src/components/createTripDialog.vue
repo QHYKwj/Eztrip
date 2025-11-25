@@ -9,7 +9,7 @@
   >
     <v-card class="rounded-lg">
       <!-- 1. 美化的头部：使用 Toolbar 添加背景色和标题 -->
-      <v-toolbar color="deep-purple-accent-3" density="compact">
+      <v-toolbar color="#6A4AC5" density="compact">
         <v-icon class="ml-4" icon="mdi-airplane-takeoff" />
         <v-toolbar-title class="text-subtitle-1 font-weight-bold">
           开启新旅程
@@ -149,7 +149,7 @@
           取消
         </v-btn>
         <v-btn
-          color="deep-purple-accent-3"
+          color="#903DFE"
           :loading="loading"
           prepend-icon="mdi-check"
           variant="elevated"

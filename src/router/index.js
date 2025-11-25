@@ -11,15 +11,15 @@ import hello from '@/components/HelloWorld.vue'
 import defaultlayout from '@/layouts/default.vue'
 // import { routes } from 'vue-router/auto-routes'
 import init from '@/layouts/init.vue'
+import AI from '@/pages/AI.vue'
 import CreateTripPage from '@/pages/CreateTripPage.vue'
 import forgotPassword from '@/pages/forgot-password.vue'
 import login from '@/pages/login.vue'
 import Message from '@/pages/message.vue'
+import plan from '@/pages/plan.vue'
 import Profile from '@/pages/profile.vue'
 import register from '@/pages/register.vue'
 import welcomehome from '@/pages/welcomehome.vue'
-import AI from '@/pages/AI.vue'
-import plan from '@/pages/plan.vue'
 const routes = [
   {
     path: '/',
@@ -37,15 +37,15 @@ const routes = [
         path: '/home',
         component: welcomehome,
       },
-      { 
-        path: '/AI', 
-        name: 'AI', 
-        component: AI 
+      {
+        path: '/AI',
+        name: 'AI',
+        component: AI,
       },
-      { 
-        path: '/plan', 
-        name: 'plan', 
-        component: plan
+      {
+        path: '/plan',
+        name: 'plan',
+        component: plan,
       },
     ],
   },
@@ -76,7 +76,7 @@ const routes = [
     name: 'Message',
     component: Message,
   },
-  
+
 ]
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
