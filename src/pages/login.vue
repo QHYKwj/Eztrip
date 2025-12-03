@@ -50,65 +50,75 @@
 </template>
 
 <script>
-import axios from 'axios'
+  import axios from 'axios'
 
-export default {
-  data: () => ({
-    valid: true,
-    // 修改部分：将 email 改为 username
-    username: '',
-    usernameRules: [
-      v => !!v || 'Username is required', // 只保留非空校验，去掉了邮箱格式正则
-    ],
-    password: '',
-    passwordRules: [
-      v => !!v || 'Password is required',
-    ],
-  }),
-  computed: {
-    // 修改部分：计算属性对应 username
-    usernameErrors () {
-      return this.usernameRules.filter(rule => !rule(this.username)).map(rule => rule(this.username))
+  export default {
+    data: () => ({
+      valid: true,
+      // 修改部分：将 email 改为 username
+      username: '',
+      usernameRules: [
+        v => !!v || 'Username is required', // 只保留非空校验，去掉了邮箱格式正则
+      ],
+      password: '',
+      passwordRules: [
+        v => !!v || 'Password is required',
+      ],
+    }),
+    computed: {
+      // 修改部分：计算属性对应 username
+      usernameErrors () {
+        return this.usernameRules.filter(rule => !rule(this.username)).map(rule => rule(this.username))
+      },
+      passwordErrors () {
+        return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
+      },
     },
-    passwordErrors () {
-      return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
-    },
-  },
-  methods: {
-    async login () {
-      // 表单验证
-      if (!this.$refs.form.validate()) {
-        alert('请检查输入是否正确')
-        return
-      }
-
-      try {
-        // 调用后端 API
-        const formData = new FormData()
-        // 修改部分：使用 this.username
-        formData.append('username', this.username)
-        formData.append('password', this.password)
-
-        const res = await axios.post('/api/login', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-
-        // 登录成功
-        console.log(res.data)
-        alert(res.data.message || '登录成功')
-        this.$router.push('/home')
-      } catch (error) {
-        if (error.response && error.response.status === 401) {
-          // 提示信息也稍微改得更准确一点
-          alert('登录失败：用户名或密码错误')
-        } else {
-          console.error(error)
-          alert('登录失败，请检查网络或服务器')
+    methods: {
+      async login () {
+        // 表单验证
+        if (!this.$refs.form.validate()) {
+          alert('请检查输入是否正确')
+          return
         }
-      }
+
+        try {
+          // 调用后端 API
+          const formData = new FormData()
+          // 修改部分：使用 this.username
+          formData.append('username', this.username)
+          formData.append('password', this.password)
+
+          const res = await axios.post('/api/login', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          // 登录成功
+          console.log(res.data)
+          alert(res.data.message || '登录成功')
+          // 后端返回: { message, username, user_id }
+          const user = {
+            username: res.data.username,
+            user_id: res.data.user_id,
+          }
+          // 1. 存到 localStorage，页面刷新也不会丢
+          localStorage.setItem('user', JSON.stringify(user))
+
+          // 2. 如果你有全局状态（Pinia / Vuex）也可以同时存一份
+          // const userStore = useUserStore()
+          // userStore.setUser(user)
+          this.$router.push('/home')
+        } catch (error) {
+          if (error.response && error.response.status === 401) {
+            // 提示信息也稍微改得更准确一点
+            alert('登录失败：用户名或密码错误')
+          } else {
+            console.error(error)
+            alert('登录失败，请检查网络或服务器')
+          }
+        }
+      },
     },
-  },
-}
+  }
 </script>
 
 <style scoped>

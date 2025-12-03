@@ -20,6 +20,7 @@ import plan from '@/pages/plan.vue'
 import Profile from '@/pages/profile.vue'
 import register from '@/pages/register.vue'
 import welcomehome from '@/pages/welcomehome.vue'
+import Trip from '@/pages/trip.vue'
 const routes = [
   {
     path: '/',
@@ -46,6 +47,16 @@ const routes = [
         path: '/plan',
         name: 'plan',
         component: plan,
+      },
+      {
+        path: '/trip/:tripId',
+        name: 'Trip',
+        component: Trip,
+        // 如果你想把 tripId / tripName 作为 props 传入，也可以这样：
+        props: route => ({
+          tripId: Number(route.params.tripId),
+          tripName: route.query.tripName,
+        }),
       },
     ],
   },

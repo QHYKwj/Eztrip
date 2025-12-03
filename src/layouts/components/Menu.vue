@@ -7,9 +7,8 @@
     <v-list density="comfortable">
       <v-list-subheader class="menu-title">所有行程</v-list-subheader>
 
-      <!-- 一级 -->
+      <!-- 我的行程（一级） -->
       <v-list-item class="menu-item level-1 clickable" @click="toggleExpand">
-        <!-- 注意：缩进应用在 .menu-line 上 -->
         <div class="menu-line level-1-line">
           <v-icon class="item-icon">mdi-briefcase</v-icon>
           <span class="item-title">我的行程</span>
@@ -20,23 +19,36 @@
         </div>
       </v-list-item>
 
-      <!-- 二级 -->
+      <!-- 我的行程（二级，动态列表） -->
       <v-expand-transition>
         <div v-if="expand">
-          <v-list-item class="menu-item level-2 clickable" @click="selectTrip('珠海一日游')">
+          <v-list-item
+            v-for="trip in myTrips"
+            :key="trip.trip_id"
+            class="menu-item level-2 clickable"
+            @click="selectTrip(trip)"
+          >
             <div class="menu-line level-2-line">
               <v-icon class="item-icon">mdi-map-marker</v-icon>
-              <span :class="['item-title', selected === '珠海一日游' ? 'selected' : '']">
-                珠海一日游
+              <span
+                :class="[
+                  'item-title',
+                  selectedTripId === trip.trip_id ? 'selected' : ''
+                ]"
+              >
+                {{ trip.trip_name }}
               </span>
             </div>
           </v-list-item>
+
+          <div v-if="myTrips.length === 0" class="empty-tip level-2-line">
+            暂无行程
+          </div>
         </div>
       </v-expand-transition>
 
-      <!-- 一级 -->
+      <!-- 收藏（一级） -->
       <v-list-item class="menu-item level-1 clickable" @click="toggleExpand2">
-        <!-- 注意：缩进应用在 .menu-line 上 -->
         <div class="menu-line level-1-line">
           <v-icon class="item-icon">mdi-star</v-icon>
           <span class="item-title">收藏</span>
@@ -46,17 +58,32 @@
           </v-icon>
         </div>
       </v-list-item>
-      <!-- 二级 -->
+
+      <!-- 收藏（二级，动态列表） -->
       <v-expand-transition>
         <div v-if="expand2">
-          <v-list-item class="menu-item level-2 clickable" @click="selectTrip('南京一日游')">
+          <v-list-item
+            v-for="trip in favoriteTrips"
+            :key="trip.trip_id"
+            class="menu-item level-2 clickable"
+            @click="selectTrip(trip)"
+          >
             <div class="menu-line level-2-line">
               <v-icon class="item-icon">mdi-map-marker</v-icon>
-              <span :class="['item-title', selected === '南京一日游' ? 'selected' : '']">
-                南京一日游
+              <span
+                :class="[
+                  'item-title',
+                  selectedTripId === trip.trip_id ? 'selected' : ''
+                ]"
+              >
+                {{ trip.trip_name }}
               </span>
             </div>
           </v-list-item>
+
+          <div v-if="favoriteTrips.length === 0" class="empty-tip level-2-line">
+            暂无收藏
+          </div>
         </div>
       </v-expand-transition>
     </v-list>
@@ -64,14 +91,21 @@
 </template>
 
 <script>
+  import axios from 'axios'
+
   export default {
     name: 'Menu',
     data () {
       return {
         expand: false,
         expand2: false,
-        selected: null,
+        selectedTripId: null, // 当前选中的 trip_id
+        myTrips: [], // 我的行程
+        favoriteTrips: [], // 收藏行程
       }
+    },
+    created () {
+      this.loadTrips()
     },
     methods: {
       toggleExpand () {
@@ -80,9 +114,55 @@
       toggleExpand2 () {
         this.expand2 = !this.expand2
       },
-      selectTrip (name) {
-        this.selected = name
-        this.$emit('select', name)
+      // 从 localStorage 里拿 user_id（第 4 部分会讲登录时怎么存）
+      getUserIdFromStorage () {
+        const userStr = localStorage.getItem('user')
+        if (!userStr) return null
+        try {
+          const user = JSON.parse(userStr)
+          return user.user_id || user.id || null
+        } catch {
+          return null
+        }
+      },
+      async loadTrips () {
+        const userId = this.getUserIdFromStorage()
+        if (!userId) {
+          console.warn('未获取到 user_id，可能尚未登录')
+          return
+        }
+
+        try {
+          const res = await axios.get('/api/trips', {
+            params: { user_id: userId },
+          })
+          const trips = res.data || []
+
+          // 根据 is_collected 字段拆分我的行程 & 收藏，并按 trip_id 排序
+          this.myTrips = trips
+            .filter(t => !t.is_collected)
+            .sort((a, b) => a.trip_id - b.trip_id)
+
+          this.favoriteTrips = trips
+            .filter(t => t.is_collected)
+            .sort((a, b) => a.trip_id - b.trip_id)
+        } catch (error) {
+          console.error('加载行程失败', error)
+        }
+      },
+      // 点击某个行程
+      selectTrip (trip) {
+        this.selectedTripId = trip.trip_id
+        // 通知父组件（如果你有用）
+        this.$emit('select', trip)
+
+        // 跳转到 /trip/:tripId
+        // 同时把 trip_name 作为 query 带给 trip.vue
+        this.$router.push({
+          name: 'Trip',
+          params: { tripId: trip.trip_id },
+          query: { tripName: trip.trip_name },
+        })
       },
     },
   }
@@ -124,7 +204,6 @@
   background-color: #E7E6FB;
 }
 
-/* 关键：我们把“一行布局”和缩进应用在 .menu-line 上，避免 v-list-item 的内部结构覆盖 */
 .menu-line {
   display: flex;
   align-items: center;
@@ -132,19 +211,17 @@
 }
 
 .level-1-line {
-  padding-left: 16px;   /* 一级缩进 */
+  padding-left: 16px;
 }
 .level-2-line {
-  padding-left: 48px;   /* 二级更大缩进，视觉明显 */
+  padding-left: 48px;
 }
 
-/* 小调整：让图标与文字间距合理 */
 .item-icon {
   margin-right: 8px;
   color: #555;
 }
 
-/* 文字、箭头样式 */
 .item-title {
   font-size: 14px;
   color: #333;
@@ -158,7 +235,14 @@
   font-weight: bold;
   color: #3F51B5;
 }
+
 .clickable {
   cursor: pointer;
+}
+
+.empty-tip {
+  font-size: 13px;
+  color: #888;
+  padding: 4px 0 8px;
 }
 </style>
