@@ -259,7 +259,7 @@
                   @click="deleteAnnouncement(item.id)"
                   style="color: #e53935;"
                 >
-                  <v-icon>mdi-trash</v-icon>
+                  <v-icon>mdi-delete-outline</v-icon>
                 </v-btn>
                 <v-btn
                   small
