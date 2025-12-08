@@ -1,12 +1,11 @@
 <template>
   <div class="admin-container">
-    <!-- 顶部导航栏 -->
+    <!-- 顶部导航栏（移除侧边栏切换按钮） -->
     <v-app-bar
       elevation="0"
       style="background-color: #F3F2FD; border-bottom: 1px solid #DBD1EF; z-index: 10"
     >
-      <v-app-bar-nav-icon @click="toggleSidebar" style="color: #675096" />
-      <v-toolbar-title style="color: #675096; font-weight: 600">
+      <v-toolbar-title style="color: #675096; font-weight: 600; margin-left: 16px;">
         管理员中心
       </v-toolbar-title>
       <v-spacer />
@@ -30,20 +29,21 @@
         </span>
       </v-btn>
       <v-btn
-        style="background-color: #e53935; color: white; margin-left: 10px"
+        style="background-color: #e53935; color: white; margin-left: 10px; margin-right: 16px;"
         @click="logout"
       >
         <v-icon left>mdi-logout</v-icon>登出
       </v-btn>
     </v-app-bar>
 
+    <!-- 布局：左侧固定导航栏 + 右侧主内容 -->
     <div class="admin-layout">
-      <!-- 侧边导航栏 -->
+      <!-- 左侧导航栏（固定不可收起） -->
       <v-navigation-drawer
-        v-model="sidebarOpen"
         :width="250"
         style="background-color: #F3F2FD; border-right: 1px solid #DBD1EF"
         permanent
+        fixed
       >
         <v-list>
           <v-list-item
@@ -51,6 +51,7 @@
             :key="index"
             @click="activeSidebarItem = index"
             :class="activeSidebarItem === index ? 'selected-item' : ''"
+            style="height: 60px;"
           >
             <v-list-item-icon style="color: #675096">
               <v-icon>{{ item.icon }}</v-icon>
@@ -60,10 +61,10 @@
         </v-list>
       </v-navigation-drawer>
 
-      <!-- 主体内容区 -->
+      <!-- 主体内容区（避开导航栏遮挡） -->
       <v-container fluid class="admin-content">
         <!-- 统计卡片 -->
-        <v-row class="stats-row">
+        <v-row class="stats-row" style="margin-top: 24px;">
           <v-col cols="12" sm="6" md="3" v-for="(stat, index) in stats" :key="index">
             <v-card class="stat-card" outlined>
               <v-card-title style="color: #675096; font-size: 16px">
@@ -210,6 +211,66 @@
               </v-btn>
             </v-form>
           </v-card-text>
+
+          <!-- 公告管理面板 -->
+          <v-card-text v-if="activeSidebarItem === 3">
+            <!-- 搜索和操作区 -->
+            <div class="user-controls">
+              <v-text-field
+                v-model="announcementSearch"
+                label="搜索公告"
+                prepend-icon="mdi-magnify"
+                style="width: 300px;"
+              />
+              <v-btn
+                style="background-color: #742DD8; color: white;"
+                @click="openAnnouncementDialog"
+              >
+                <v-icon left>mdi-plus</v-icon>发布公告
+              </v-btn>
+            </div>
+
+            <!-- 公告表格 -->
+            <v-data-table
+              :items="announcements"
+              :search="announcementSearch"
+              :headers="announcementHeaders"
+              class="announcement-table"
+              item-key="id"
+              :items-per-page-options="[10, 20, 50]"
+            >
+              <template v-slot:item.published="{ item }">
+                <v-chip :color="item.published ? 'green' : 'grey'">
+                  {{ item.published ? '已发布' : '草稿' }}
+                </v-chip>
+              </template>
+              <template v-slot:item.actions="{ item }">
+                <v-btn
+                  icon
+                  small
+                  @click="editAnnouncement(item)"
+                  style="color: #675096;"
+                >
+                  <v-icon>mdi-pencil</v-icon>
+                </v-btn>
+                <v-btn
+                  icon
+                  small
+                  @click="deleteAnnouncement(item.id)"
+                  style="color: #e53935;"
+                >
+                  <v-icon>mdi-trash</v-icon>
+                </v-btn>
+                <v-btn
+                  small
+                  @click="toggleAnnouncementStatus(item)"
+                  :style="item.published ? 'background-color: #f57c00; color: white;' : 'background-color: #43a047; color: white;'"
+                >
+                  {{ item.published ? '取消发布' : '发布' }}
+                </v-btn>
+              </template>
+            </v-data-table>
+          </v-card-text>
         </v-card>
       </v-container>
     </div>
@@ -255,6 +316,46 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- 公告编辑对话框 -->
+    <v-dialog v-model="announcementDialogOpen" max-width="800px">
+      <v-card>
+        <v-card-title>{{ editingAnnouncement ? '编辑公告' : '发布公告' }}</v-card-title>
+        <v-card-text>
+          <v-form>
+            <v-text-field
+              v-model="currentAnnouncement.title"
+              label="公告标题"
+              required
+              full-width
+            />
+            <v-textarea
+              v-model="currentAnnouncement.content"
+              label="公告内容"
+              required
+              rows="8"
+              full-width
+              style="margin-top: 16px;"
+            />
+            <v-switch
+              v-model="currentAnnouncement.published"
+              label="立即发布"
+              color="#742DD8"
+              style="margin-top: 16px;"
+            />
+          </v-form>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn @click="announcementDialogOpen = false">取消</v-btn>
+          <v-btn
+            style="background-color: #742DD8; color: white;"
+            @click="saveAnnouncement"
+          >
+            保存
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -263,19 +364,22 @@ export default {
   name: "AdminPanel",
   data() {
     return {
-      // 状态管理
-      sidebarOpen: true,
+      // 状态管理（移除sidebarOpen）
       activeSidebarItem: 0,
       searchQuery: "",
+      announcementSearch: "",
       unreadNotifications: 3,
       userDialogOpen: false,
+      announcementDialogOpen: false,
       editingUser: null,
+      editingAnnouncement: null,
       
       // 侧边栏项目
       sidebarItems: [
         { title: "用户管理", icon: "mdi-account" },
         { title: "内容审核", icon: "mdi-file-check" },
-        { title: "系统设置", icon: "mdi-cog" }
+        { title: "系统设置", icon: "mdi-cog" },
+        { title: "公告管理", icon: "mdi-bullhorn" }
       ],
       
       // 统计数据
@@ -286,21 +390,24 @@ export default {
         { title: "待审核内容", value: 12, change: -3 }
       ],
       
-      // 用户数据
+      // 用户/内容/公告数据（保持不变）
       users: [
         { id: 1, username: "john_doe", email: "john@example.com", role: "admin", status: true, registered: "2024-01-15" },
         { id: 2, username: "jane_smith", email: "jane@example.com", role: "user", status: true, registered: "2024-02-20" },
         { id: 3, username: "mike_brown", email: "mike@example.com", role: "moderator", status: false, registered: "2024-03-05" }
       ],
-      
-      // 内容数据
       contents: [
         { id: 1, title: "三亚旅行攻略", author: "jane_smith", type: "article", status: "pending", created: "2024-05-10" },
         { id: 2, title: "北京美食推荐", author: "mike_brown", type: "article", status: "approved", created: "2024-05-09" },
         { id: 3, title: "上海行程规划", author: "john_doe", type: "plan", status: "rejected", created: "2024-05-08" }
       ],
+      announcements: [
+        { id: 1, title: "系统维护通知", content: "本系统将于5月20日进行维护，届时可能无法正常访问，敬请谅解。", published: true, created: "2024-05-15", updated: "2024-05-15" },
+        { id: 2, title: "新功能上线公告", content: "我们新增了用户积分系统，欢迎大家体验！", published: true, created: "2024-05-10", updated: "2024-05-10" },
+        { id: 3, title: "端午节活动策划", content: "端午节将举办线上答题活动，奖品丰富，敬请期待...", published: false, created: "2024-05-05", updated: "2024-05-06" }
+      ],
       
-      // 表格头部
+      // 表格头部（保持不变）
       userHeaders: [
         { text: "ID", value: "id" },
         { text: "用户名", value: "username" },
@@ -310,7 +417,6 @@ export default {
         { text: "注册日期", value: "registered" },
         { text: "操作", value: "actions", sortable: false }
       ],
-      
       contentHeaders: [
         { text: "ID", value: "id" },
         { text: "标题", value: "title" },
@@ -320,16 +426,29 @@ export default {
         { text: "创建日期", value: "created" },
         { text: "操作", value: "actions", sortable: false }
       ],
+      announcementHeaders: [
+        { text: "ID", value: "id" },
+        { text: "标题", value: "title" },
+        { text: "状态", value: "published" },
+        { text: "创建日期", value: "created" },
+        { text: "更新日期", value: "updated" },
+        { text: "操作", value: "actions", sortable: false }
+      ],
       
-      // 当前编辑的用户
+      // 当前编辑对象（保持不变）
       currentUser: {
         username: "",
         email: "",
         role: "user",
         status: true
       },
+      currentAnnouncement: {
+        title: "",
+        content: "",
+        published: false
+      },
       
-      // 系统设置
+      // 系统设置（保持不变）
       settings: {
         enableRegistration: true,
         enableGuestAccess: false,
@@ -339,82 +458,97 @@ export default {
     };
   },
   methods: {
-    // 切换侧边栏
-    toggleSidebar() {
-      this.sidebarOpen = !this.sidebarOpen;
-    },
+    // 移除toggleSidebar方法（无需收起侧边栏）
     
-    // 登出功能
+    // 登出功能（保持不变）
     logout() {
-      // 实际项目中这里应该清除用户登录状态
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userRole');
       this.$router.push('/login');
     },
     
-    // 刷新数据
+    // 其他方法（刷新、用户/内容/公告管理等保持不变）
     refreshData() {
-      // 实际项目中这里会调用API刷新数据
       this.$toast.success("数据已刷新");
     },
-    
-    // 显示通知
     showNotifications() {
       this.unreadNotifications = 0;
-      // 显示通知面板逻辑
     },
-    
-    // 用户管理相关方法
     openUserDialog() {
       this.editingUser = null;
       this.currentUser = { username: "", email: "", role: "user", status: true };
       this.userDialogOpen = true;
     },
-    
     editUser(user) {
       this.editingUser = user.id;
       this.currentUser = { ...user };
       this.userDialogOpen = true;
     },
-    
     saveUser() {
       if (this.editingUser) {
-        // 更新现有用户
         const index = this.users.findIndex(u => u.id === this.editingUser);
         this.users.splice(index, 1, this.currentUser);
       } else {
-        // 添加新用户
         this.currentUser.id = Date.now();
         this.currentUser.registered = new Date().toISOString().split("T")[0];
         this.users.push(this.currentUser);
       }
       this.userDialogOpen = false;
     },
-    
     deleteUser(id) {
       if (confirm("确定要删除这个用户吗？")) {
         this.users = this.users.filter(user => user.id !== id);
       }
     },
-    
     updateUserStatus(user) {
-      // 实际项目中这里会调用API更新用户状态
       console.log(`用户 ${user.username} 状态已更新为 ${user.status ? '启用' : '禁用'}`);
     },
-    
-    // 内容审核相关方法
     approveContent(id) {
       const content = this.contents.find(c => c.id === id);
       if (content) content.status = "approved";
     },
-    
     rejectContent(id) {
       const content = this.contents.find(c => c.id === id);
       if (content) content.status = "rejected";
     },
-    
-    // 系统设置相关方法
     saveSettings() {
-      // 实际项目中这里会调用API保存设置
       this.$toast.success("设置已保存");
+    },
+    openAnnouncementDialog() {
+      this.editingAnnouncement = null;
+      this.currentAnnouncement = { title: "", content: "", published: false };
+      this.announcementDialogOpen = true;
+    },
+    editAnnouncement(announcement) {
+      this.editingAnnouncement = announcement.id;
+      this.currentAnnouncement = { ...announcement };
+      this.announcementDialogOpen = true;
+    },
+    saveAnnouncement() {
+      const currentDate = new Date().toISOString().split("T")[0];
+      if (this.editingAnnouncement) {
+        const index = this.announcements.findIndex(a => a.id === this.editingAnnouncement);
+        this.currentAnnouncement.updated = currentDate;
+        this.announcements.splice(index, 1, this.currentAnnouncement);
+      } else {
+        this.currentAnnouncement.id = Date.now();
+        this.currentAnnouncement.created = currentDate;
+        this.currentAnnouncement.updated = currentDate;
+        this.announcements.push(this.currentAnnouncement);
+      }
+      this.announcementDialogOpen = false;
+      this.$toast.success(this.editingAnnouncement ? "公告已更新" : "公告已发布");
+    },
+    deleteAnnouncement(id) {
+      if (confirm("确定要删除这个公告吗？")) {
+        this.announcements = this.announcements.filter(announcement => announcement.id !== id);
+        this.$toast.success("公告已删除");
+      }
+    },
+    toggleAnnouncementStatus(announcement) {
+      announcement.published = !announcement.published;
+      announcement.updated = new Date().toISOString().split("T")[0];
+      this.$toast.success(`公告已${announcement.published ? '发布' : '取消发布'}`);
     }
   }
 };
@@ -426,58 +560,62 @@ export default {
   background-color: #FAFAFA;
 }
 
+/* 布局调整：左侧固定 + 右侧自适应 */
 .admin-layout {
   display: flex;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 64px); /* 减去顶部导航栏高度 */
 }
 
+/* 左侧导航栏固定宽度，不收缩 */
+.v-navigation-drawer {
+  width: 250px !important;
+  flex-shrink: 0;
+  height: calc(100vh - 64px) !important; /* 与主内容区高度一致 */
+}
+
+/* 主内容区：避开左侧导航栏 + 顶部间距 */
 .admin-content {
-  padding: 24px;
+  padding: 24px 32px;
   flex: 1;
-  max-width: 1200px;
-  margin: 0 auto;
+  max-width: calc(100% - 250px); /* 减去左侧导航栏宽度 */
   width: 100%;
+  box-sizing: border-box;
 }
 
+/* 统计卡片样式（保持不变） */
 .stats-row {
   margin-bottom: 24px;
 }
-
 .stat-card {
   border-color: #DBD1EF;
   background-color: white;
   height: 100%;
   transition: transform 0.2s;
 }
-
 .stat-card:hover {
   transform: translateY(-5px);
 }
-
 .stat-value {
   font-size: 24px;
   font-weight: 600;
   color: #444;
 }
-
 .stat-change {
   font-size: 14px;
   margin-top: 4px;
 }
-
 .positive {
   color: #43a047;
 }
-
 .negative {
   color: #e53935;
 }
 
+/* 内容区域样式（保持不变） */
 .admin-card {
   border-color: #DBD1EF;
   background-color: white;
 }
-
 .user-controls {
   display: flex;
   justify-content: space-between;
@@ -487,6 +625,7 @@ export default {
   gap: 16px;
 }
 
+/* 通知角标（保持不变） */
 .notification-badge {
   position: absolute;
   top: 8px;
@@ -502,21 +641,21 @@ export default {
   justify-content: center;
 }
 
+/* 侧边栏选中项样式（保持不变） */
 .selected-item {
   background-color: rgba(116, 45, 216, 0.1);
   border-right: 4px solid #742DD8;
 }
 
+/* 响应式适配（保持不变） */
 @media (max-width: 600px) {
   .admin-content {
     padding: 16px;
   }
-  
   .user-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
   .v-text-field {
     width: 100% !important;
   }
