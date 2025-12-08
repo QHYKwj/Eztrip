@@ -132,7 +132,7 @@
                   @click="deleteUser(item.id)"
                   style="color: #e53935;"
                 >
-                  <v-icon>mdi-trash</v-icon>
+                  <v-icon>mdi-delete-outline</v-icon>
                 </v-btn>
               </template>
             </v-data-table>
@@ -555,17 +555,24 @@ export default {
 </script>
 
 <style scoped>
+
 .admin-container {
   min-height: 100vh;
   background-color: #FAFAFA;
 }
 
-/* 布局调整：左侧固定 + 右侧自适应 */
 .admin-layout {
   display: flex;
-  min-height: calc(100vh - 64px); /* 减去顶部导航栏高度 */
 }
 
+/* 解决内容被遮挡问题 */
+.admin-content {
+  padding: 24px;
+  margin-left: 250px; /* Drawer */
+  margin-top: 64px;   /* AppBar */
+  width: calc(100% - 250px);
+  box-sizing: border-box;
+}
 /* 左侧导航栏固定宽度，不收缩 */
 .v-navigation-drawer {
   width: 250px !important;
