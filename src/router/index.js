@@ -21,6 +21,7 @@ import Profile from '@/pages/profile.vue'
 import register from '@/pages/register.vue'
 import welcomehome from '@/pages/welcomehome.vue'
 import Trip from '@/pages/trip.vue'
+import admin from '@/pages/admin.vue'
 const routes = [
   {
     path: '/',
@@ -86,6 +87,11 @@ const routes = [
     path: '/message',
     name: 'Message',
     component: Message,
+  },
+  {
+    path: '/admin', // 新增admin路由
+    name: 'Admin',
+    component: admin
   },
 
 ]
