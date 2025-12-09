@@ -173,47 +173,8 @@
             </v-data-table>
           </v-card-text>
 
-          <!-- 系统设置面板 -->
-          <v-card-text v-if="activeSidebarItem === 2">
-            <v-form>
-              <v-checkbox
-                v-model="settings.enableRegistration"
-                label="允许新用户注册"
-                color="#742DD8"
-              />
-              <v-checkbox
-                v-model="settings.enableGuestAccess"
-                label="允许游客访问"
-                color="#742DD8"
-              />
-              <v-slider
-                v-model="settings.sessionTimeout"
-                label="会话超时时间 (分钟)"
-                min="5"
-                max="120"
-                step="5"
-                color="#742DD8"
-                style="margin-top: 16px;"
-              />
-              <v-text-field
-                v-model="settings.maxFileSize"
-                label="最大文件上传大小 (MB)"
-                type="number"
-                min="1"
-                max="100"
-                style="margin-top: 16px;"
-              />
-              <v-btn
-                style="background-color: #742DD8; color: white; margin-top: 24px;"
-                @click="saveSettings"
-              >
-                <v-icon left>mdi-save</v-icon>保存设置
-              </v-btn>
-            </v-form>
-          </v-card-text>
-
           <!-- 公告管理面板 -->
-          <v-card-text v-if="activeSidebarItem === 3">
+          <v-card-text v-if="activeSidebarItem === 2">
             <!-- 搜索和操作区 -->
             <div class="user-controls">
               <v-text-field
@@ -244,31 +205,29 @@
                   {{ item.published ? '已发布' : '草稿' }}
                 </v-chip>
               </template>
-              <template v-slot:item.actions="{ item }">
-                <v-btn
-                  icon
-                  small
-                  @click="editAnnouncement(item)"
-                  style="color: #675096;"
-                >
+            <template v-slot:item.actions="{ item }">
+              <div style="display:flex; gap:12px; align-items:center;">
+                <v-btn icon small @click="editAnnouncement(item)" style="color: #675096;">
                   <v-icon>mdi-pencil</v-icon>
                 </v-btn>
-                <v-btn
-                  icon
-                  small
-                  @click="deleteAnnouncement(item.id)"
-                  style="color: #e53935;"
-                >
+
+                <v-btn icon small @click="deleteAnnouncement(item.id)" style="color: #e53935;">
                   <v-icon>mdi-delete-outline</v-icon>
                 </v-btn>
+
                 <v-btn
-                  small
-                  @click="toggleAnnouncementStatus(item)"
-                  :style="item.published ? 'background-color: #f57c00; color: white;' : 'background-color: #43a047; color: white;'"
-                >
-                  {{ item.published ? '取消发布' : '发布' }}
-                </v-btn>
-              </template>
+              small
+              @click="toggleAnnouncementStatus(item)"
+              :style="{
+                backgroundColor: item.published ? '#f57c00' : '#43a047',
+                color: 'white',
+                marginLeft: '24px'  // 注意这里是驼峰式命名（marginLeft）
+              }"
+            >
+              {{ item.published ? '取消发布' : '发布' }}
+            </v-btn>
+  </div>
+</template>
             </v-data-table>
           </v-card-text>
         </v-card>
@@ -378,7 +337,6 @@ export default {
       sidebarItems: [
         { title: "用户管理", icon: "mdi-account" },
         { title: "内容审核", icon: "mdi-file-check" },
-        { title: "系统设置", icon: "mdi-cog" },
         { title: "公告管理", icon: "mdi-bullhorn" }
       ],
       
@@ -409,30 +367,30 @@ export default {
       
       // 表格头部（保持不变）
       userHeaders: [
-        { text: "ID", value: "id" },
-        { text: "用户名", value: "username" },
-        { text: "邮箱", value: "email" },
-        { text: "角色", value: "role" },
-        { text: "状态", value: "status" },
-        { text: "注册日期", value: "registered" },
-        { text: "操作", value: "actions", sortable: false }
+        { text: "ID", value: "id", sortable: true, align: "start" },
+        { text: "用户名", value: "username", sortable: true, align: "start" },
+        { text: "邮箱", value: "email", sortable: true, align: "start" },
+        { text: "角色", value: "role", sortable: true, align: "center" },
+        { text: "状态", value: "status", sortable: true, align: "center" },
+        { text: "注册日期", value: "registered", sortable: true, align: "center" },
+        { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       contentHeaders: [
-        { text: "ID", value: "id" },
-        { text: "标题", value: "title" },
-        { text: "作者", value: "author" },
-        { text: "类型", value: "type" },
-        { text: "状态", value: "status" },
-        { text: "创建日期", value: "created" },
-        { text: "操作", value: "actions", sortable: false }
+        { text: "ID", value: "id", sortable: true, align: "start" },
+        { text: "标题", value: "title", sortable: true, align: "start" },
+        { text: "作者", value: "author", sortable: true, align: "center" },
+        { text: "类型", value: "type", sortable: true, align: "center" },
+        { text: "状态", value: "status", sortable: true, align: "center" },
+        { text: "创建日期", value: "created", sortable: true, align: "center" },
+        { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       announcementHeaders: [
-        { text: "ID", value: "id" },
-        { text: "标题", value: "title" },
-        { text: "状态", value: "published" },
-        { text: "创建日期", value: "created" },
-        { text: "更新日期", value: "updated" },
-        { text: "操作", value: "actions", sortable: false }
+        { text: "ID", value: "id", sortable: true, align: "start" },
+        { text: "标题", value: "title", sortable: true, align: "start" },
+        { text: "状态", value: "published", sortable: true, align: "center" },
+        { text: "创建日期", value: "created", sortable: true, align: "center" },
+        { text: "更新日期", value: "updated", sortable: true, align: "center" },
+        { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       
       // 当前编辑对象（保持不变）
@@ -555,6 +513,40 @@ export default {
 </script>
 
 <style scoped>
+::v-deep .v-data-table thead {
+  display: table-header-group !important; /* 强制渲染表头组 */
+  visibility: visible !important;
+}
+
+::v-deep .v-data-table th.v-data-table-header__cell {
+  display: table-cell !important;
+  height: 56px !important; /* 标准表头高度 */
+  min-height: 56px !important;
+  padding: 0 16px !important; /* 内边距，避免文字截断 */
+  color: #675096 !important; /* 主题色 */
+  font-weight: 600 !important;
+  border-bottom: 2px solid #DBD1EF !important; /* 表头底部边框，醒目 */
+}
+
+/* 表格内容垂直居中，避免布局错乱 */
+::v-deep .v-data-table td.v-data-table__cell {
+  vertical-align: middle !important;
+  padding: 12px 16px !important;
+}
+
+/* 修复公告表格操作列拥挤问题（之前 150px 导致布局错乱） */
+::v-deep .announcement-table .v-data-table__cell:last-child {
+  min-width: 200px !important; /* 给操作列留足够宽度 */
+}
+
+.action-group {
+  display: flex;
+  gap: 12px; /* 按钮之间保持固定间距 */
+}
+
+.action-btn {
+  margin-left: 12px;
+}
 
 .admin-container {
   min-height: 100vh;
