@@ -15,6 +15,7 @@ from routers import finduser
 from routers import create_trip
 from routers import collect_trip
 from routers import map
+from routers import profile
 app = FastAPI(title="FastAPI Login Example")
 
 
@@ -26,6 +27,7 @@ app.include_router(finduser.router)
 app.include_router(create_trip.router)
 app.include_router(collect_trip.router)
 app.include_router(map.router)
+app.include_router(profile.router)
 # 使用示例
 if __name__ == "__main__":
     db_conn = connect_db()
