@@ -3,6 +3,7 @@ from fastapi import FastAPI
 import uvicorn
 from settings import SERVER_HOST, SERVER_PORT
 from fastapi.middleware.cors import CORSMiddleware
+
 # 导入配置
 from config.connect_db import connect_db
 
@@ -16,6 +17,7 @@ from routers import create_trip
 from routers import collect_trip
 from routers import map
 from routers import profile
+from routers.notice import create_notice 
 app = FastAPI(title="FastAPI Login Example")
 
 
@@ -28,6 +30,7 @@ app.include_router(create_trip.router)
 app.include_router(collect_trip.router)
 app.include_router(map.router)
 app.include_router(profile.router)
+app.include_router(create_notice.router)
 # 使用示例
 if __name__ == "__main__":
     db_conn = connect_db()

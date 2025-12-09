@@ -18,9 +18,13 @@
    ```bash
    pip install -r requirements.txt
    pip install python-multipart
+   pip install fastapi
+   pip install uvicorn
    ```
    // MySQL Connector<br>
-   pip install mysql-connector-python
+   pip install mysql-connector-python<br>
+   // 如果mysql依赖下载失败换这个<br>
+   pip install pymysql
 ## 配置
 
 项目配置文件位于 `settings.py`，可根据需要修改以下内容：

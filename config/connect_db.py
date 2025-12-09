@@ -1,3 +1,5 @@
+import pymysql
+pymysql.install_as_MySQLdb()
 import mysql.connector
 from mysql.connector import Error
 import json
