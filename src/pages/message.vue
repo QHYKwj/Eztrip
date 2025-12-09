@@ -67,7 +67,7 @@
     >
       <v-list-item
         v-for="(msg, index) in filteredMessages"
-        :key="index"
+        :key="msg.id"
         :class="{ 'bg-primary-lighten-5': msg.unread }"
         @click="handleMsgClick(msg, index)"
       >
@@ -108,111 +108,151 @@
 </template>
 
 <script>
-  import { notificationState } from '@/stores/notificationState'
+import axios from 'axios'
+import { notificationState } from '@/stores/notificationState'
 
-  export default {
-    name: 'MessageCenter',
-    data () {
-      return {
-        isLoading: true,
-        activeFilter: 'all',
-        filterOptions: [
-          { title: '全部消息', value: 'all' },
-          { title: '未读消息', value: 'unread' },
-          { title: '已读消息', value: 'read' },
-        ],
-        messages: [
-          {
-            sender: '系统通知',
-            type: 'system',
-            content: '您的2025年11月行程申请已通过审核，可在「行程」页面查看详情。',
-            time: 1_730_613_000_000,
-            unread: true,
-          },
-          {
-            sender: '客服小助手',
-            type: 'service',
-            content: '您上周咨询的「AI生成行程」功能已上线，快去体验吧！',
-            time: 1_730_534_400_000,
-            unread: true,
-          },
-          {
-            sender: '系统通知',
-            type: 'system',
-            content: '账号安全提醒：您的账号于2025-11-01在杭州登录。',
-            time: 1_730_448_000_000,
-            unread: false,
-          },
-          {
-            sender: '行程助手',
-            type: 'service',
-            content: '您11月5日的「上海出差」行程已添加天气提醒。',
-            time: 1_730_361_600_000,
-            unread: false,
-          },
-        ],
+export default {
+  name: 'MessageCenter',
+  data () {
+    return {
+      isLoading: true,
+      activeFilter: 'all',
+      filterOptions: [
+        { title: '全部消息', value: 'all' },
+        { title: '未读消息', value: 'unread' },
+        { title: '已读消息', value: 'read' },
+      ],
+      messages: [], // 从后端加载
+    }
+  },
+  computed: {
+    filteredMessages () {
+      switch (this.activeFilter) {
+        case 'unread':
+          return this.messages.filter(m => m.unread)
+        case 'read':
+          return this.messages.filter(m => !m.unread)
+        default:
+          return this.messages
       }
     },
-    computed: {
-      filteredMessages () {
-        switch (this.activeFilter) {
-          case 'unread': {
-            return this.messages.filter(m => m.unread)
-          }
-          case 'read': {
-            return this.messages.filter(m => !m.unread)
-          }
-          default: {
-            return this.messages
-          }
-        }
-      },
-      hasReadMessages () {
-        return this.messages.some(m => !m.unread)
-      },
-      hasUnreadMessages () {
-        return this.messages.some(m => m.unread)
-      },
+    hasReadMessages () {
+      return this.messages.some(m => !m.unread)
     },
-    mounted () {
-      setTimeout(() => {
+    hasUnreadMessages () {
+      return this.messages.some(m => m.unread)
+    },
+  },
+  async mounted () {
+    await this.fetchMessages()
+  },
+  methods: {
+    getUserFromStorage () {
+      // 你前面已经把登录信息改到 sessionStorage，这里保持一致
+      const str = sessionStorage.getItem('user')
+      if (!str) return null
+      try {
+        return JSON.parse(str)
+      } catch {
+        return null
+      }
+    },
+    async fetchMessages () {
+      const user = this.getUserFromStorage()
+      if (!user || !user.user_id) {
         this.isLoading = false
-        this.updateGlobalUnreadCount()
-      }, 800)
-    },
-    methods: {
-      formatTime (timestamp) {
-        const date = new Date(timestamp)
-        return date.toLocaleString('zh-CN', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
+        return
+      }
+
+      this.isLoading = true
+      try {
+        const res = await axios.get('/api/notifications', {
+          params: { user_id: user.user_id },
         })
-      },
-      handleMsgClick (msg, index) {
-        if (msg.unread) {
-          this.messages[index].unread = false
-          this.updateGlobalUnreadCount()
-        }
-      },
-      clearReadMessages () {
-        this.messages = this.messages.filter(m => m.unread)
+
+        // 后端返回：[{ id, kind, sender, title, content, created_at, unread, type }, ...]
+        this.messages = (res.data || []).map(raw => {
+          const time = new Date(raw.created_at).getTime()
+          return {
+            id: raw.id,
+            kind: raw.kind,      // 'message' | 'notice'
+            sender: raw.sender,
+            title: raw.title,
+            content: raw.content,
+            type: raw.type,      // 'system' | 'service'
+            time,
+            unread: !!raw.unread,
+          }
+        })
+
         this.updateGlobalUnreadCount()
-      },
-      markAllAsRead () {
-        this.messages = this.messages.map(m => ({
-          ...m,
-          unread: false,
-        }))
-        this.updateGlobalUnreadCount()
-      },
-      updateGlobalUnreadCount () {
-        const unread = this.messages.filter(m => m.unread).length
-        notificationState.unreadCount = unread
-      },
+      } catch (e) {
+        console.error('加载消息失败', e)
+      } finally {
+        this.isLoading = false
+      }
     },
-  }
+    formatTime (timestamp) {
+      const date = new Date(timestamp)
+      if (Number.isNaN(date.getTime())) return ''
+      return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    },
+    async handleMsgClick (msg, index) {
+      // 如果是个人消息且未读，调用后端标记已读
+      if (msg.kind === 'message' && msg.unread) {
+        const user = this.getUserFromStorage()
+        if (user && user.user_id) {
+          try {
+            await axios.put(`/api/notifications/messages/${msg.id}/read`, null, {
+              params: { user_id: user.user_id },
+            })
+          } catch (e) {
+            console.error('标记消息已读失败（前端继续本地置为已读）', e)
+          }
+        }
+        // 本地更新
+        const idxInAll = this.messages.findIndex(m => m.id === msg.id && m.kind === msg.kind)
+        if (idxInAll !== -1) {
+          this.messages[idxInAll].unread = false
+        }
+        this.updateGlobalUnreadCount()
+      }
+    },
+    clearReadMessages () {
+      // 只在前端列表中清空已读，不动数据库
+      this.messages = this.messages.filter(m => m.unread)
+      this.updateGlobalUnreadCount()
+    },
+    async markAllAsRead () {
+      const user = this.getUserFromStorage()
+      if (!user || !user.user_id) return
+
+      try {
+        await axios.put('/api/notifications/messages/read-all', null, {
+          params: { user_id: user.user_id },
+        })
+      } catch (e) {
+        console.error('一键已读接口失败（前端仍然本地置为已读）', e)
+      }
+
+      // 本地把所有 message 标记为已读（notice 不受影响；但这里统一置为 false 问题也不大）
+      this.messages = this.messages.map(m => ({
+        ...m,
+        unread: false,
+      }))
+      this.updateGlobalUnreadCount()
+    },
+    updateGlobalUnreadCount () {
+      const unread = this.messages.filter(m => m.unread).length
+      notificationState.unreadCount = unread
+    },
+  },
+}
 </script>
 
 <style scoped>

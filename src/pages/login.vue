@@ -103,8 +103,8 @@
             admin_id: res.data.admin_id, // 普通用户为 null
           }
 
-          // 存到 localStorage
-          localStorage.setItem('user', JSON.stringify(user))
+          // 存到 sessionStorage
+          sessionStorage.setItem('user', JSON.stringify(user))
 
           // 根据 admin_id 决定跳转页面
           // 注意这里判断 null/undefined 均视为“普通用户”

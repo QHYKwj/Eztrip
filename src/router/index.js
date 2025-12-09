@@ -104,11 +104,11 @@ const router = createRouter({
 // Workaround for https://github.com/vitejs/vite/issues/11804
 router.onError((err, to) => {
   if (err?.message?.includes?.('Failed to fetch dynamically imported module')) {
-    if (localStorage.getItem('vuetify:dynamic-reload')) {
+    if (sessionStorage.getItem('vuetify:dynamic-reload')) {
       console.error('Dynamic import error, reloading page did not fix it', err)
     } else {
       console.log('Reloading page to fix dynamic import error')
-      localStorage.setItem('vuetify:dynamic-reload', 'true')
+      sessionStorage.setItem('vuetify:dynamic-reload', 'true')
       location.assign(to.fullPath)
     }
   } else {
@@ -117,14 +117,14 @@ router.onError((err, to) => {
 })
 
 router.isReady().then(() => {
-  localStorage.removeItem('vuetify:dynamic-reload')
+  sessionStorage.removeItem('vuetify:dynamic-reload')
 })
 // -----------------------------------------------------
 // 全局路由守卫：登录控制 + 管理员权限控制
 // -----------------------------------------------------
 router.beforeEach((to, from, next) => {
-  // 获取 localStorage 中的用户信息
-  const userStr = localStorage.getItem('user')
+  // 获取 sessionStorage 中的用户信息
+  const userStr = sessionStorage.getItem('user')
   let user = null
 
   if (userStr) {
@@ -132,7 +132,7 @@ router.beforeEach((to, from, next) => {
       user = JSON.parse(userStr)
     } catch {
       console.error('解析用户信息失败，已清除本地存储')
-      localStorage.removeItem('user')
+      sessionStorage.removeItem('user')
       user = null
     }
   }

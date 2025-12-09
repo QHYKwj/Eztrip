@@ -91,82 +91,82 @@
 </template>
 
 <script>
-  import axios from 'axios'
+import axios from 'axios'
 
-  export default {
-    name: 'Menu',
-    data () {
-      return {
-        expand: false,
-        expand2: false,
-        selectedTripId: null, // 当前选中的 trip_id
-        myTrips: [], // 我的行程
-        favoriteTrips: [], // 收藏行程
+export default {
+  name: 'Menu',
+  data () {
+    return {
+      expand: false,
+      expand2: false,
+      selectedTripId: null, // 当前选中的 trip_id
+      myTrips: [], // 我的行程
+      favoriteTrips: [], // 收藏行程
+    }
+  },
+  created () {
+    this.loadTrips()
+  },
+  methods: {
+    toggleExpand () {
+      this.expand = !this.expand
+    },
+    toggleExpand2 () {
+      this.expand2 = !this.expand2
+    },
+    // 从 sessionStorage 里拿 user_id
+    getUserIdFromStorage () {
+      const userStr = sessionStorage.getItem('user')
+      if (!userStr) return null
+      try {
+        const user = JSON.parse(userStr)
+        return user.user_id || user.id || null
+      } catch {
+        return null
       }
     },
-    created () {
-      this.loadTrips()
-    },
-    methods: {
-      toggleExpand () {
-        this.expand = !this.expand
-      },
-      toggleExpand2 () {
-        this.expand2 = !this.expand2
-      },
-      // 从 localStorage 里拿 user_id（第 4 部分会讲登录时怎么存）
-      getUserIdFromStorage () {
-        const userStr = localStorage.getItem('user')
-        if (!userStr) return null
-        try {
-          const user = JSON.parse(userStr)
-          return user.user_id || user.id || null
-        } catch {
-          return null
-        }
-      },
-      async loadTrips () {
-        const userId = this.getUserIdFromStorage()
-        if (!userId) {
-          console.warn('未获取到 user_id，可能尚未登录')
-          return
-        }
+    async loadTrips () {
+      const userId = this.getUserIdFromStorage()
+      if (!userId) {
+        console.warn('未获取到 user_id，可能尚未登录')
+        return
+      }
 
-        try {
-          const res = await axios.get('/api/trips', {
-            params: { user_id: userId },
-          })
-          const trips = res.data || []
-
-          // 根据 is_collected 字段拆分我的行程 & 收藏，并按 trip_id 排序
-          this.myTrips = trips
-            .filter(t => !t.is_collected)
-            .sort((a, b) => a.trip_id - b.trip_id)
-
-          this.favoriteTrips = trips
-            .filter(t => t.is_collected)
-            .sort((a, b) => a.trip_id - b.trip_id)
-        } catch (error) {
-          console.error('加载行程失败', error)
-        }
-      },
-      // 点击某个行程
-      selectTrip (trip) {
-        this.selectedTripId = trip.trip_id
-        // 通知父组件（如果你有用）
-        this.$emit('select', trip)
-
-        // 跳转到 /trip/:tripId
-        // 同时把 trip_name 作为 query 带给 trip.vue
-        this.$router.push({
-          name: 'Trip',
-          params: { tripId: trip.trip_id },
-          query: { tripName: trip.trip_name },
+      try {
+        const res = await axios.get('/api/trips', {
+          params: { user_id: userId },
         })
-      },
+        const trips = res.data || []
+
+        // ✅ “我的行程”：owner_user_id === 当前用户
+        this.myTrips = trips
+          .filter(t => t.owner_user_id === userId)
+          .sort((a, b) => a.trip_id - b.trip_id)
+
+        // ✅ “收藏”：当前用户在 trip_favorite 里收藏的行程（后端已经算好 is_collected）
+        // 如果你不想显示“我收藏自己的行程”，可以再加一个条件 t.owner_user_id !== userId
+        this.favoriteTrips = trips
+          .filter(t => t.is_collected && t.owner_user_id !== userId)
+          .sort((a, b) => a.trip_id - b.trip_id)
+      } catch (error) {
+        console.error('加载行程失败', error)
+      }
     },
-  }
+    // 点击某个行程
+    selectTrip (trip) {
+      this.selectedTripId = trip.trip_id
+      this.$emit('select', trip)
+
+      this.$router.push({
+        name: 'Trip',
+        params: { tripId: trip.trip_id },
+        query: { tripName: trip.trip_name },
+      })
+    },
+  },
+}
 </script>
+
 
 <style scoped>
 .drawer {

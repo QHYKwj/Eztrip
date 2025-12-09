@@ -421,7 +421,7 @@ export default {
     // 登出功能（保持不变）
     logout() {
       // 删除登录信息
-      localStorage.removeItem('user')
+      sessionStorage.removeItem('user')
 
       // 跳转到登录页面
       this.$router.push('/login')

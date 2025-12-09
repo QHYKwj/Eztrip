@@ -223,7 +223,7 @@ export default {
   },
   methods: {
     getUserFromStorage () {
-      const str = localStorage.getItem('user')
+      const str = sessionStorage.getItem('user')
       if (!str) return null
       try {
         return JSON.parse(str)
@@ -329,7 +329,7 @@ export default {
       }
     },
     logout () {
-      localStorage.removeItem('user')
+      sessionStorage.removeItem('user')
       this.$router.push('/login')
     },
   },

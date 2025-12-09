@@ -115,7 +115,7 @@
     },
     methods: {
       getUserIdFromStorage () {
-        const userStr = localStorage.getItem('user')
+        const userStr = sessionStorage.getItem('user')
         if (!userStr) return null
         try {
           const user = JSON.parse(userStr)
