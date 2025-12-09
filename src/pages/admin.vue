@@ -332,14 +332,14 @@ export default {
       announcementDialogOpen: false,
       editingUser: null,
       editingAnnouncement: null,
-      
+
       // 侧边栏项目
       sidebarItems: [
         { title: "用户管理", icon: "mdi-account" },
         { title: "内容审核", icon: "mdi-file-check" },
         { title: "公告管理", icon: "mdi-bullhorn" }
       ],
-      
+
       // 统计数据
       stats: [
         { title: "总用户数", value: 1280, change: 12 },
@@ -347,7 +347,7 @@ export default {
         { title: "内容总数", value: 3560, change: 5 },
         { title: "待审核内容", value: 12, change: -3 }
       ],
-      
+
       // 用户/内容/公告数据（保持不变）
       users: [
         { id: 1, username: "john_doe", email: "john@example.com", role: "admin", status: true, registered: "2024-01-15" },
@@ -364,7 +364,7 @@ export default {
         { id: 2, title: "新功能上线公告", content: "我们新增了用户积分系统，欢迎大家体验！", published: true, created: "2024-05-10", updated: "2024-05-10" },
         { id: 3, title: "端午节活动策划", content: "端午节将举办线上答题活动，奖品丰富，敬请期待...", published: false, created: "2024-05-05", updated: "2024-05-06" }
       ],
-      
+
       // 表格头部（保持不变）
       userHeaders: [
         { text: "ID", value: "id", sortable: true, align: "start" },
@@ -392,7 +392,7 @@ export default {
         { text: "更新日期", value: "updated", sortable: true, align: "center" },
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
-      
+
       // 当前编辑对象（保持不变）
       currentUser: {
         username: "",
@@ -405,7 +405,7 @@ export default {
         content: "",
         published: false
       },
-      
+
       // 系统设置（保持不变）
       settings: {
         enableRegistration: true,
@@ -417,14 +417,16 @@ export default {
   },
   methods: {
     // 移除toggleSidebar方法（无需收起侧边栏）
-    
+
     // 登出功能（保持不变）
     logout() {
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('userRole');
-      this.$router.push('/login');
+      // 删除登录信息
+      localStorage.removeItem('user')
+
+      // 跳转到登录页面
+      this.$router.push('/login')
     },
-    
+
     // 其他方法（刷新、用户/内容/公告管理等保持不变）
     refreshData() {
       this.$toast.success("数据已刷新");
