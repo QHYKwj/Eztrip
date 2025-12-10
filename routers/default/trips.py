@@ -3,10 +3,11 @@ from fastapi import APIRouter, HTTPException, Query, Form
 from typing import Optional
 from config.connect_db import connect_db
 
-router = APIRouter(prefix="/api/trips", tags=["trips"])
+# 创建一个新的APIRouter实例
+router = APIRouter(prefix="/api/trips",tags=["trips"])
 
-
-@router.get("")
+# 列出行程的路由
+@router.get("/list")
 async def list_trips(user_id: int = Query(..., description="当前登录用户 user_id")):
     """
     返回当前用户相关的行程列表：
@@ -71,18 +72,18 @@ async def list_trips(user_id: int = Query(..., description="当前登录用户 u
             db_conn.close()
 
 
-@router.post("")
+# 创建行程的路由
+@router.post("/create")
 async def create_trip(
         owner_user_id: int = Form(...),
         title: str = Form(...),
         destination: str = Form(...),
         start_date: str = Form(...),  # 'YYYY-MM-DD'
         end_date: str = Form(...),    # 'YYYY-MM-DD'
-        template_id: Optional[int] = Form(None),
+        class_type: int = Form(...),  # 行程类型字段，1: 休闲, 2: 美食, 3: 商务, 4: 家庭
 ):
     """
     创建一个新的行程（草稿状态）。
-    可以和前端的 CreateTripDialog 对接。
     """
     db_conn = None
     cursor = None
@@ -95,11 +96,11 @@ async def create_trip(
 
         sql = """
             INSERT INTO trip
-              (owner_user_id, template_id, title, destination, start_date, end_date, publish_status)
+              (owner_user_id, title, destination, start_date, end_date, class)
             VALUES
-              (%s, %s, %s, %s, %s, %s, 'draft');
+              (%s, %s, %s, %s, %s, %s);
         """
-        cursor.execute(sql, (owner_user_id, template_id, title, destination, start_date, end_date))
+        cursor.execute(sql, (owner_user_id, title, destination, start_date, end_date, class_type))
         db_conn.commit()
 
         new_id = cursor.lastrowid
