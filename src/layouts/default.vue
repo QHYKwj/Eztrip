@@ -45,6 +45,7 @@ export default {
 }
 </script>
 
+
 <style>
 .layout {
   background-color: #F3F2FD;

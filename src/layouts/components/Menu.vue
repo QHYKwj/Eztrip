@@ -91,82 +91,82 @@
 </template>
 
 <script>
-import axios from 'axios'
+  import axios from 'axios'
 
-export default {
-  name: 'Menu',
-  data () {
-    return {
-      expand: false,
-      expand2: false,
-      selectedTripId: null, // 当前选中的 trip_id
-      myTrips: [], // 我的行程
-      favoriteTrips: [], // 收藏行程
-    }
-  },
-  created () {
-    this.loadTrips()
-  },
-  methods: {
-    toggleExpand () {
-      this.expand = !this.expand
-    },
-    toggleExpand2 () {
-      this.expand2 = !this.expand2
-    },
-    // 从 sessionStorage 里拿 user_id
-    getUserIdFromStorage () {
-      const userStr = sessionStorage.getItem('user')
-      if (!userStr) return null
-      try {
-        const user = JSON.parse(userStr)
-        return user.user_id || user.id || null
-      } catch {
-        return null
+  export default {
+    name: 'Menu',
+    data () {
+      return {
+        expand: false,
+        expand2: false,
+        selectedTripId: null, // 当前选中的 trip_id
+        myTrips: [], // 我的行程
+        favoriteTrips: [], // 收藏行程
       }
     },
-    async loadTrips () {
-      const userId = this.getUserIdFromStorage()
-      if (!userId) {
-        console.warn('未获取到 user_id，可能尚未登录')
-        return
-      }
+    created () {
+      this.loadTrips()
+    },
+    methods: {
+      toggleExpand () {
+        this.expand = !this.expand
+      },
+      toggleExpand2 () {
+        this.expand2 = !this.expand2
+      },
+      // 从 localStorage 里获取 user_id
+      getUserIdFromStorage () {
+        const userStr = sessionStorage.getItem('user')
+        if (!userStr) return null
+        try {
+          const user = JSON.parse(userStr)
+          return user.user_id || user.id || null
+        } catch {
+          return null
+        }
+      },
+      // 加载行程
+      async loadTrips () {
+        const userId = this.getUserIdFromStorage()
+        if (!userId) {
+          console.warn('未获取到 user_id，可能尚未登录')
+          return
+        }
 
-      try {
-        const res = await axios.get('/api/trips', {
-          params: { user_id: userId },
+        try {
+          const res = await axios.get('/api/trips/list', {
+            params: { user_id: userId },
+          })
+          const trips = res.data || []
+
+          // ✅ “我的行程”：owner_user_id === 当前用户
+          this.myTrips = trips
+            .filter(t => t.owner_user_id === userId)
+            .sort((a, b) => a.trip_id - b.trip_id)
+
+          // ✅ “收藏”：当前用户在 trip_favorite 里收藏的行程（后端已经算好 is_collected）
+          // 如果你不想显示“我收藏自己的行程”，可以再加一个条件 t.owner_user_id !== userId
+          this.favoriteTrips = trips
+            .filter(t => t.is_collected && t.owner_user_id !== userId)
+            .sort((a, b) => a.trip_id - b.trip_id)
+        } catch (error) {
+          console.error('加载行程失败', error)
+        }
+      },
+      // 点击某个行程
+      selectTrip (trip) {
+        this.selectedTripId = trip.trip_id
+        this.$emit('select', trip)
+
+        this.$router.push({
+          name: 'Trip',
+          params: { tripId: trip.trip_id },
+          query: { tripName: trip.trip_name },
         })
-        const trips = res.data || []
-
-        // ✅ “我的行程”：owner_user_id === 当前用户
-        this.myTrips = trips
-          .filter(t => t.owner_user_id === userId)
-          .sort((a, b) => a.trip_id - b.trip_id)
-
-        // ✅ “收藏”：当前用户在 trip_favorite 里收藏的行程（后端已经算好 is_collected）
-        // 如果你不想显示“我收藏自己的行程”，可以再加一个条件 t.owner_user_id !== userId
-        this.favoriteTrips = trips
-          .filter(t => t.is_collected && t.owner_user_id !== userId)
-          .sort((a, b) => a.trip_id - b.trip_id)
-      } catch (error) {
-        console.error('加载行程失败', error)
-      }
+      },
     },
-    // 点击某个行程
-    selectTrip (trip) {
-      this.selectedTripId = trip.trip_id
-      this.$emit('select', trip)
-
-      this.$router.push({
-        name: 'Trip',
-        params: { tripId: trip.trip_id },
-        query: { tripName: trip.trip_name },
-      })
-    },
-  },
-}
+  }
 </script>
-
 
 <style scoped>
 .drawer {

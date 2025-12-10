@@ -1,4 +1,3 @@
-<!-- components/createTripDialog.vue -->
 <template>
   <v-dialog
     max-width="600px"
@@ -25,8 +24,8 @@
           <!-- 行程名称 -->
           <v-text-field
             v-model="form.tripName"
-            color="deep-purple"
             class="mb-2"
+            color="deep-purple"
             density="comfortable"
             label="行程名称"
             placeholder="例如：暑期日本七日游"
@@ -38,8 +37,8 @@
           <!-- 目的地 -->
           <v-text-field
             v-model="form.destination"
-            color="deep-purple"
             class="mb-2"
+            color="deep-purple"
             density="comfortable"
             label="目的地"
             placeholder="例如：东京"
@@ -47,6 +46,20 @@
             :rules="rules.required"
             variant="outlined"
           />
+
+          <!-- 行程类型选择 -->
+          <div class="text-subtitle-2 text-grey-darken-1 mb-2">行程类型</div>
+          <v-chip-group
+            v-model="form.class"
+            column
+            :rules="rules.required"
+            selected-class="text-deep-purple-accent-3"
+          >
+            <v-chip filter value="1" variant="outlined">⛱️ 休闲度假</v-chip>
+            <v-chip filter value="2" variant="outlined">🍜 美食探店</v-chip>
+            <v-chip filter value="3" variant="outlined">💼 商务出差</v-chip>
+            <v-chip filter value="4" variant="outlined">👨‍👩‍👧‍👦 家庭亲子</v-chip>
+          </v-chip-group>
 
           <!-- 日期选择区域：并排显示 -->
           <v-row>
@@ -108,20 +121,6 @@
             </v-col>
           </v-row>
 
-          <!-- 行程标签选择 -->
-          <div class="text-subtitle-2 text-grey-darken-1 mb-2">行程类型</div>
-          <v-chip-group
-            v-model="form.tags"
-            column
-            multiple
-            selected-class="text-deep-purple-accent-3"
-          >
-            <v-chip filter value="休闲" variant="outlined">⛱️ 休闲度假</v-chip>
-            <v-chip filter value="美食" variant="outlined">🍜 美食探店</v-chip>
-            <v-chip filter value="商务" variant="outlined">💼 商务出差</v-chip>
-            <v-chip filter value="家庭" variant="outlined">👨‍👩‍👧‍👦 家庭亲子</v-chip>
-          </v-chip-group>
-
           <!-- 备注/描述 -->
           <v-textarea
             v-model="form.description"
@@ -179,7 +178,7 @@ const loading = ref(false)
 const menuStart = ref(false)
 const menuEnd = ref(false)
 
-// 使用 reactive 聚合表单数据
+// 使用 reactive 聚合表单数据，管理更方便
 const form = reactive({
   tripName: '',
   destination: '',
@@ -187,6 +186,7 @@ const form = reactive({
   endDate: null,
   tags: [],
   description: '',
+  class: null, // 新增的行程类型
 })
 
 // --- 校验规则 ---
@@ -198,8 +198,8 @@ const rules = {
   },
 }
 
-// --- 工具：格式化日期为 YYYY-MM-DD ---
-function formatDate (date) {
+// --- Computed: 格式化日期显示 ---
+function formatDate(date) {
   if (!date) return ''
   const d = new Date(date)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -208,73 +208,85 @@ function formatDate (date) {
 const formattedStartDate = computed(() => formatDate(form.startDate))
 const formattedEndDate = computed(() => formatDate(form.endDate))
 
-// 从 sessionStorage 中获取当前用户
-function getCurrentUser () {
-  const str = sessionStorage.getItem('user')
-  if (!str) return null
-  try {
-    return JSON.parse(str)
-  } catch {
-    return null
-  }
-}
+// --- Methods ---
 
 // 关闭并重置
-function handleClose () {
+function handleClose() {
   emit('update:modelValue', false)
   setTimeout(() => {
-    resetForm()
+    resetForm() // 延迟重置，避免弹窗关闭时内容突然清空的视觉闪烁
   }, 300)
 }
 
 // 重置表单
-function resetForm () {
+function resetForm() {
   form.tripName = ''
   form.destination = ''
   form.startDate = null
   form.endDate = null
   form.tags = []
   form.description = ''
+  form.class = null
   if (formRef.value) formRef.value.resetValidation()
 }
 
-// 提交保存（调用后端 /api/trips）
-async function saveTrip () {
+// 提交保存
+async function saveTrip() {
+  // 1. 触发表单校验
   const { valid } = await formRef.value.validate()
   if (!valid) return
 
-  const user = getCurrentUser()
-  if (!user || !user.user_id) {
-    alert('请先登录后再创建行程')
-    return
-  }
-
   loading.value = true
+
   try {
+    // 2. 获取用户数据
+    const user = JSON.parse(sessionStorage.getItem('user'))
+    if (!user || !user.user_id) {
+      alert('请先登录')
+      loading.value = false
+      return
+    }
+
+    // 3. 格式化日期为 YYYY-MM-DD 格式
+    const formattedStartDate = formatDate(form.startDate)
+    const formattedEndDate = formatDate(form.endDate)
+
+    // 4. 将 tripData.class 转换为整数类型
+    const classType = Number.parseInt(form.class)
+
+    // 5. 创建 FormData 对象
     const formData = new FormData()
-    formData.append('owner_user_id', String(user.user_id))
+    formData.append('owner_user_id', user.user_id)
     formData.append('title', form.tripName)
     formData.append('destination', form.destination)
-    formData.append('start_date', formatDate(form.startDate))
-    formData.append('end_date', formatDate(form.endDate))
-    // 目前后端 create_trip 的 template_id 可选，这里先不传或传空
-    // formData.append('template_id', '')
+    formData.append('start_date', formattedStartDate)
+    formData.append('end_date', formattedEndDate)
+    formData.append('class_type', classType)
 
-    const res = await axios.post('/api/trips', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    // 6. 发送请求到后端
+    const response = await axios.post('/api/trips/create', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     })
 
-    // 通知父组件创建成功
-    emit('tripCreated', res.data)
+    console.log(response.data)
+
+    // 7. 创建成功后通知父组件
+    emit('tripCreated', { ...form }) // 使用解构传递数据副本
     loading.value = false
     handleClose()
-  } catch (err) {
-    console.error('创建行程失败', err)
-    alert('创建行程失败，请稍后重试')
+  } catch (error) {
+    console.error('创建行程失败', error)
     loading.value = false
   }
 }
+
+
 </script>
+
+
+
 
 <style scoped>
 /* 微调输入框样式，使其更清爽 */
