@@ -9,13 +9,14 @@ from config.connect_db import connect_db
 # 进入后端网址： http://127.0.0.1:8000/docs
 # 导入路由
 from routers.user import change_password, profile, register, login
-from routers import finduser
-from routers import create_trip
-from routers import collect_trip
-from routers import map
+from routers.innessory import create_trip, collect_trip, finduser
+from routers.trip_detail.map import router as map_router
+from routers.trip_detail.trip_details import router as trip_detail_router
+from routers.trip_detail.trip_update import router as trip_update_router
 from routers.notice import create_notice
 from routers.default import trips
 from routers.user_message import notifications
+from routers.collect import trip_favourite_count
 app = FastAPI(title="FastAPI Login Example")
 
 
@@ -26,11 +27,17 @@ app.include_router(change_password.router)
 app.include_router(finduser.router)
 app.include_router(create_trip.router)
 app.include_router(collect_trip.router)
-app.include_router(map.router)
+app.include_router(map_router)
+app.include_router(trip_detail_router)
 app.include_router(profile.router)
 app.include_router(create_notice.router)
 app.include_router(trips.router)
 app.include_router(notifications.router)
+app.include_router(trip_update_router)
+app.include_router(trip_favourite_count.router)
+# for r in app.routes:
+#     if hasattr(r, "methods"):
+#         print(r.path, r.methods)
 # 使用示例
 if __name__ == "__main__":
     db_conn = connect_db()
