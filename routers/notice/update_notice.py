@@ -4,7 +4,7 @@ from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/notice", tags=["notice"])
 @router.post("/update_notice")
-async def update_notice(notice_id: int = Form(...), title: str = Form(...), content: str = Form(...)):
+async def update_notice(notice_id: int = Form(...), title: str = Form(...), content: str = Form(...), is_active: int = Form(...)):
     db_conn = None
     cursor = None
     try:
@@ -31,8 +31,8 @@ async def update_notice(notice_id: int = Form(...), title: str = Form(...), cont
         cursor = db_conn.cursor()
 
         # 3.更新公告到数据库
-        update_query = "UPDATE notice SET notice_title = %s, notice_content = %s WHERE notice_id = %s;"
-        cursor.execute(update_query, (title, content, notice_id))
+        update_query = "UPDATE notice SET notice_title = %s, notice_content = %s, is_active = %s WHERE notice_id = %s;"
+        cursor.execute(update_query, (title, content, is_active, notice_id))
         if cursor.rowcount == 0:
             raise HTTPException(
                 status_code=400, 

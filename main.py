@@ -13,10 +13,11 @@ from routers.innessory import create_trip, collect_trip, finduser
 from routers.trip_detail.map import router as map_router
 from routers.trip_detail.trip_details import router as trip_detail_router
 from routers.trip_detail.trip_update import router as trip_update_router
-from routers.notice import create_notice
+from routers.notice import create_notice, update_notice, all_notice_info, delete_notice
 from routers.default import trips
 from routers.user_message import notifications
 from routers.collect import trip_favourite_count
+from routers.admin import user_count, content_count, pending_review_count, delete_user, update_user_status, all_user_info
 app = FastAPI(title="FastAPI Login Example")
 
 
@@ -35,6 +36,16 @@ app.include_router(trips.router)
 app.include_router(notifications.router)
 app.include_router(trip_update_router)
 app.include_router(trip_favourite_count.router)
+app.include_router(user_count.router)
+app.include_router(content_count.router)
+app.include_router(pending_review_count.router)
+app.include_router(delete_user.router)
+app.include_router(update_user_status.router)
+app.include_router(all_user_info.router)
+app.include_router(update_notice.router)
+app.include_router(all_notice_info.router)
+app.include_router(delete_notice.router)
+
 # for r in app.routes:
 #     if hasattr(r, "methods"):
 #         print(r.path, r.methods)

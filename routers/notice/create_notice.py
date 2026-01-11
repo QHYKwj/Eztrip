@@ -4,7 +4,7 @@ from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/notice", tags=["notice"])
 @router.post("/create_notice")
-async def create_notice(title: str = Form(...), content: str = Form(...)):
+async def create_notice(title: str = Form(...), content: str = Form(...), admin_id: int = Form(...), is_active: int = Form(...)):
     db_conn = None
     cursor = None
     try:
@@ -26,8 +26,8 @@ async def create_notice(title: str = Form(...), content: str = Form(...)):
         cursor = db_conn.cursor()
 
         # 3.插入公告到数据库
-        insert_query = "INSERT INTO notice (notice_title, notice_content) VALUES (%s, %s);"
-        cursor.execute(insert_query, (title, content))
+        insert_query = "INSERT INTO notice (notice_title, notice_content, create_at, admin_id, is_active) VALUES (%s, %s, %s, %s, %s);"
+        cursor.execute(insert_query, (title, content, admin_id, is_active))
         if cursor.rowcount == 0:
             raise HTTPException(
                 status_code=400, 
