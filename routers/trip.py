@@ -1,8 +1,9 @@
 # routers/trip.py
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body,Query
 from pydantic import BaseModel
 from config.connect_db import connect_db
 from datetime import date
+from typing import Optional
 
 router = APIRouter()
 
@@ -30,8 +31,8 @@ async def create_trip(trip: TripCreate):
             first_tag = trip.tags[0]
             if "休闲" in first_tag: class_val = 1
             elif "美食" in first_tag: class_val = 2
-            elif "商务" in first_tag: class_val = 3
-            elif "家庭" in first_tag: class_val = 4
+            elif "冒险" in first_tag: class_val = 3
+            elif "文化" in first_tag: class_val = 4
 
         # SQL 插入语句 (增加了 class 和 remarks)
         # 注意: 字段名 `class` 最好加反引号，防止 SQL 解析错误
@@ -88,6 +89,139 @@ async def get_my_trips(user_id: int = 1):
             })
 
         return {"trips": trips}
+    finally:
+        cursor.close()
+        conn.close()
+
+# ---------------------------------------------------------
+# 新增：行程搜索/筛选接口
+# ---------------------------------------------------------
+@router.get("/search")
+async def search_trips(
+    destination: Optional[str] = None,
+    style: Optional[str] = None,  # 接收前端传来的 'leisure', 'food' 等
+    days: Optional[str] = None    # 接收前端传来的 '1', '2', '3', '4-7', '7+'
+):
+    conn = connect_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 1. 构建基础 SQL (只查公开的行程)
+        sql = """
+            SELECT
+                trip_id, title, destination, start_date, end_date,
+                class, remarks, avatar, username
+            FROM trip
+            JOIN user_info ON trip.owner_user_id = user_info.user_id
+            WHERE is_public = 1
+        """
+        params = []
+
+        # 2. 动态拼接筛选条件
+
+        # --- A. 地点筛选 (模糊查询) ---
+        if destination:
+            sql += " AND destination LIKE %s"
+            params.append(f"%{destination}%")
+
+        # --- B. 风格筛选 (将英文转数字) ---
+        style_map = {
+            'leisure': 1,
+            'food': 2,
+            'adventure': 3,
+            'culture': 4,
+        }
+
+        if style and style in style_map:
+            sql += " AND class = %s"
+            params.append(style_map[style])
+
+        # --- C. 时间天数筛选 ---
+        if days:
+            duration_sql = "DATEDIFF(end_date, start_date) + 1"
+
+            if days == '7+':
+                sql += f" AND {duration_sql} > 7"
+            elif '-' in days: # 处理 '4-7' 这种情况
+                start_d, end_d = days.split('-')
+                sql += f" AND {duration_sql} BETWEEN %s AND %s"
+                params.append(start_d)
+                params.append(end_d)
+            else: # 处理单天 '1', '2', '3'
+                sql += f" AND {duration_sql} = %s"
+                params.append(days)
+
+        # 按创建时间倒序排列
+        sql += " ORDER BY trip.created_at DESC"
+
+        # 3. 执行查询
+        cursor.execute(sql, tuple(params))
+        results = cursor.fetchall()
+
+        # 4. 数据处理 (处理日期对象，防止JSON报错)
+        trips = []
+        for row in results:
+            # 计算天数返回给前端展示用
+            d_start = row['start_date']
+            d_end = row['end_date']
+            duration = (d_end - d_start).days + 1
+
+            trips.append({
+                "id": row['trip_id'],
+                "title": row['title'],
+                "destination": row['destination'],
+                "startDate": d_start.isoformat(), # 转字符串
+                "endDate": d_end.isoformat(),     # 转字符串
+                "days": duration,
+                "author": {
+                    "name": row['username'],
+                    "avatar": row['avatar'] or ""
+                },
+                "image": "" # 后面可以加封面图字段
+            })
+
+        return {"trips": trips}
+
+    except Exception as e:
+        print(f"Search Error: {e}")
+        # 返回空列表而不是报错，体验更好
+        return {"trips": []}
+    finally:
+        cursor.close()
+        conn.close()
+
+# ---------------------------------------------------------
+# 新增：获取单个行程详情接口
+# ---------------------------------------------------------
+@router.get("/detail/{trip_id}")
+async def get_trip_detail(trip_id: int):
+    conn = connect_db()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # 查询行程信息，同时关联查询作者信息
+        sql = """
+            SELECT
+                t.trip_id, t.title, t.destination, t.start_date, t.end_date,
+                t.class, t.remarks, t.publish_status, t.is_public, t.owner_user_id,
+                u.username, u.avatar
+            FROM trip t
+            JOIN user_info u ON t.owner_user_id = u.user_id
+            WHERE t.trip_id = %s
+        """
+        cursor.execute(sql, (trip_id,))
+        trip = cursor.fetchone()
+
+        if not trip:
+            raise HTTPException(status_code=404, detail="行程不存在")
+
+        # 格式化日期
+        if trip['start_date']: trip['start_date'] = trip['start_date'].isoformat()
+        if trip['end_date']: trip['end_date'] = trip['end_date'].isoformat()
+
+        return {"data": trip}
+
+    except Exception as e:
+        print(f"Get Detail Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
         conn.close()
