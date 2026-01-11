@@ -16,6 +16,7 @@ from routers.trip_detail.trip_update import router as trip_update_router
 from routers.notice import create_notice, update_notice, all_notice_info, delete_notice
 from routers.default import trips
 from routers.user_message import notifications
+from routers import trip
 from routers.collect import trip_favourite_count
 from routers.admin import user_count, content_count, pending_review_count, delete_user, update_user_status, all_user_info
 app = FastAPI(title="FastAPI Login Example")
@@ -29,11 +30,11 @@ app.include_router(finduser.router)
 app.include_router(create_trip.router)
 app.include_router(collect_trip.router)
 app.include_router(map_router)
-app.include_router(trip_detail_router)
 app.include_router(profile.router)
 app.include_router(create_notice.router)
 app.include_router(trips.router)
 app.include_router(notifications.router)
+<<<<<<< HEAD
 app.include_router(trip_update_router)
 app.include_router(trip_favourite_count.router)
 app.include_router(user_count.router)
@@ -49,6 +50,9 @@ app.include_router(delete_notice.router)
 # for r in app.routes:
 #     if hasattr(r, "methods"):
 #         print(r.path, r.methods)
+=======
+app.include_router(trip.router, prefix="/api/trip", tags=["trip"])
+>>>>>>> cc946bbe4c99bcacc294bb3bd0ae8e3b3737d0f0
 # 使用示例
 if __name__ == "__main__":
     db_conn = connect_db()
