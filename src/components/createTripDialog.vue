@@ -55,10 +55,10 @@
             :rules="rules.required"
             selected-class="text-deep-purple-accent-3"
           >
-            <v-chip filter value="1" variant="outlined">⛱️ 休闲度假</v-chip>
-            <v-chip filter value="2" variant="outlined">🍜 美食探店</v-chip>
-            <v-chip filter value="3" variant="outlined">💼 商务出差</v-chip>
-            <v-chip filter value="4" variant="outlined">👨‍👩‍👧‍👦 家庭亲子</v-chip>
+            <v-chip filter value="1" variant="outlined">⛱️ 休闲</v-chip>
+            <v-chip filter value="2" variant="outlined">🍜 美食</v-chip>
+            <v-chip filter value="3" variant="outlined">💼 冒险</v-chip>
+            <v-chip filter value="4" variant="outlined">👨‍👩‍👧‍👦 文化</v-chip>
           </v-chip-group>
 
           <!-- 日期选择区域：并排显示 -->
