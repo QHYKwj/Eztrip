@@ -20,11 +20,18 @@
    pip install python-multipart
    pip install fastapi
    pip install uvicorn
+   pip install httpx
+   pip install requests
    ```
    // MySQL Connector<br>
-   pip install mysql-connector-python<br>
-   // 如果mysql依赖下载失败换这个<br>
+   pip install mysql-connector-python
+   <br>
+   // 如果mysql依赖下载失败或者缺少模块 pymysql 换这个<br>
    pip install pymysql
+   <br>
+   // httpx 用于测试接口
+   <br>
+   
 ## 配置
 
 项目配置文件位于 `settings.py`，可根据需要修改以下内容：
@@ -43,6 +50,9 @@
 python main.py
 ```
 每次修改记得先删除venv文件夹，再安装虚拟环境<br>
+还有__pycache__文件夹也要删除<br>
+如果报错缺少模块，使用pip安装对应模块即可<br>
+<br>
 
 ## 测试
 后端测试在对应的url后+/docs即可测试

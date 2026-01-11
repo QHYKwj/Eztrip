@@ -4,7 +4,7 @@ from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/login", tags=["login"])
 
-@router.post("")
+@router.post("", summary="用户登录")
 async def login(username: str = Form(...), password: str = Form(...)):
     db_conn = None
     cursor = None

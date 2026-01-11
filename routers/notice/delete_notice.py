@@ -3,7 +3,7 @@ from fastapi import APIRouter, Form, HTTPException
 from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/notice", tags=["notice"])
-@router.post("/delete_notice")
+@router.post("/delete_notice", summary="删除公告")
 async def delete_notice(notice_id: int = Form(...)):
     db_conn = None
     cursor = None

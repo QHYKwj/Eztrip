@@ -4,7 +4,7 @@ from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/notice/all_notice_info", tags=["all_notice_info"])
 
-@router.get("")
+@router.get("", summary="获取所有公告信息")
 async def all_user_info():
     db_conn = None
     cursor = None

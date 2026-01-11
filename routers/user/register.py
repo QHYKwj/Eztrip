@@ -5,7 +5,7 @@ from config.connect_db import connect_db
 router = APIRouter(prefix="/api/register", tags=["register"])
 
 # 设置路由标识
-@router.post("")
+@router.post("", summary="用户注册")
 async def register(username: str = Form(...), email: str = Form(...), password: str = Form(...), confirm_password: str = Form(...)):
     db_conn = None
     cursor = None

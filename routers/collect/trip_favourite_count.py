@@ -3,7 +3,7 @@ from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/trip", tags=["trip_favorite"])
 
-@router.get("/favorite-count")
+@router.get("/favorite-count", summary="获取行程收藏人数")
 async def favorite_count(trip_id: int = Query(...)):
     db_conn = None
     cursor = None

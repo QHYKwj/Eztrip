@@ -3,7 +3,7 @@ from fastapi import APIRouter, Form, HTTPException
 from config.connect_db import connect_db
 
 router = APIRouter(prefix="/api/notice", tags=["notice"])
-@router.post("/update_notice")
+@router.post("/update_notice", summary="更新公告")
 async def update_notice(notice_id: int = Form(...), title: str = Form(...), content: str = Form(...), is_active: int = Form(...)):
     db_conn = None
     cursor = None
