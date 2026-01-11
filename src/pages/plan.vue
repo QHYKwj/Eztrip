@@ -90,35 +90,117 @@
 </template>
 
 <script setup>
-// 逻辑部分与之前一致，此处省略（保持不变）
-  import { computed, ref } from 'vue'
-  import SearchBar from '@/components/SearchBar.vue'
-  import TripCard from '@/components/TripCard.vue'
+import { computed, ref, onMounted } from 'vue'
+import axios from 'axios' // 新增：引入axios用于接口请求
+import SearchBar from '@/components/SearchBar.vue'
+import TripCard from '@/components/TripCard.vue'
 
-  const myTripsExpanded = ref(true)
-  const favoriteTripsExpanded = ref(true)
+// 展开/收起状态（保留原有逻辑）
+const myTripsExpanded = ref(true)
+const favoriteTripsExpanded = ref(true)
 
-  function handleSearch (query) {
-    console.log('搜索:', query)
+// 新增：存储从后端获取的原始行程数据
+const myTripsList = ref([]) // 我的行程原始数据
+const favoriteTripsList = ref([]) // 收藏行程原始数据
+// 新增：默认封面图（同welcomehome.vue，防止卡片无图）
+const defaultImage = 'https://cdn.vuetifyjs.com/images/cards/cooking.png'
+
+// 搜索/输入方法（保留原有逻辑，可后续扩展）
+function handleSearch (query) {
+  console.log('搜索:', query)
+  // 可选扩展：搜索时重新请求接口过滤数据
+  // loadTrips({ destination: query })
+}
+function handleInput (value) {
+  console.log('输入:', value)
+}
+
+// 新增：模仿Menu.vue获取用户ID的方法
+const getUserIdFromStorage = () => {
+  const userStr = sessionStorage.getItem('user')
+  if (!userStr) return null
+  try {
+    const user = JSON.parse(userStr)
+    return user.user_id || user.id || null
+  } catch {
+    return null
   }
-  function handleInput (value) {
-    console.log('输入:', value)
+}
+
+// 新增：模仿Menu.vue的loadTrips + welcomehome.vue的fetchTrips逻辑，加载行程数据
+const loadTrips = async (params = {}) => {
+  const userId = getUserIdFromStorage() || 1 // 暂时默认1，方便调试
+  try {
+    // 1. 获取我的行程（模仿Menu.vue调用/my_trips接口）
+    const myTripsRes = await axios.get('/api/trip/my_trips', {
+      params: { 
+        user_id: userId,
+        ...params // 支持传入搜索/筛选参数
+      },
+    })
+
+    // 2. 映射后端字段到TripCard需要的格式（模仿welcomehome.vue的字段映射）
+    if (myTripsRes.data && myTripsRes.data.trips) {
+      myTripsList.value = myTripsRes.data.trips.map(item => ({
+        id: item.id,
+        name: item.title, // 后端title -> 卡片需要的name
+        location: item.destination, // 后端destination -> 卡片location
+        time: String(item.days), // 后端days -> 卡片time
+        style: item.class ? getClassText(item.class) : '', // 行程风格（可选）
+        imageUrl: item.image || defaultImage, // 图片（无则用默认图）
+        author: item.author, // 作者信息
+        type: 'my' // 标记为我的行程，保持原有过滤逻辑
+      }))
+    } else {
+      myTripsList.value = []
+    }
+
+    // 3. 获取收藏行程（待后端实现/favorites接口后补充）
+    // 目前先置空，后续替换为真实接口请求
+    // const favoriteRes = await axios.get('/api/trip/favorites', {
+    //   params: { user_id: userId }
+    // })
+    // if (favoriteRes.data && favoriteRes.data.trips) {
+    //   favoriteTripsList.value = favoriteRes.data.trips.map(item => ({
+    //     id: item.id,
+    //     name: item.title,
+    //     location: item.destination,
+    //     time: String(item.days),
+    //     style: item.class ? getClassText(item.class) : '',
+    //     imageUrl: item.image || defaultImage,
+    //     author: item.author,
+    //     type: 'favorite' // 标记为收藏行程
+    //   }))
+    // } else {
+    //   favoriteTripsList.value = []
+    // }
+    favoriteTripsList.value = [] // 临时置空
+
+  } catch (error) {
+    console.error('加载行程失败:', error)
+    myTripsList.value = []
+    favoriteTripsList.value = []
   }
+}
 
-  const originalTrips = ref([
-    { id: 1, name: '我的行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-    { id: 2, name: '我的行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-    { id: 3, name: '收藏行程1', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
-    { id: 4, name: '我的行程3', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'my' },
-    { id: 5, name: '收藏行程2', imageUrl: 'https://cdn.vuetifyjs.com/images/cards/cooking.png', type: 'favorite' },
-  ])
+// 新增：模仿welcomehome.vue的辅助函数，转换行程风格数字为文字
+const getClassText = (classVal) => {
+  const map = { 1: '休闲', 2: '美食', 3: '商务', 4: '家庭' }
+  return map[classVal] || ''
+}
 
-  const myTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'my'))
-  const favoriteTrips = computed(() => originalTrips.value.filter(trip => trip.type === 'favorite'))
+// 调整：基于后端数据计算我的行程/收藏行程（保留原有computed逻辑）
+const myTrips = computed(() => myTripsList.value.filter(trip => trip.type === 'my'))
+const favoriteTrips = computed(() => favoriteTripsList.value.filter(trip => trip.type === 'favorite'))
+
+// 新增：页面挂载时加载行程数据
+onMounted(() => {
+  loadTrips()
+})
 </script>
 
 <style scoped>
-/* 搜索栏样式保持不变 */
+/* 原有样式保持不变 */
 .search-container {
   margin: 0 0 20px 0;
   display: flex;
@@ -127,17 +209,14 @@
   padding: 0 20px;
 }
 
-/* 核心修改1：卡片区域背景改为白色 */
 .trip-section {
   margin-bottom: 30px;
-  padding: 16px; /* 保留内边距 */
+  padding: 16px;
   border-radius: 8px;
-  background-color: white; /* 改为白色背景 */
-  /* 可选：添加轻微阴影增强层次感 */
+  background-color: white;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-/* 标题区域布局 */
 .section-header {
   margin-bottom: 16px;
 }
@@ -145,7 +224,7 @@
 .title-with-btn {
   display: flex;
   align-items: center;
-  gap: 8px; /* 文字与按钮间距 */
+  gap: 8px;
 }
 
 .section-title {
@@ -156,15 +235,13 @@
   white-space: nowrap;
 }
 
-/* 核心修改2：修复按钮椭圆问题，确保为正圆形 */
 .toggle-btn {
   color: #666;
-  /* 关键：固定宽高并设置圆形边框 */
   width: 24px;
   height: 24px;
-  min-width: 24px; /* 覆盖Vuetify默认最小宽度 */
-  border-radius: 50% !important; /* 强制圆形 */
-  padding: 0 !important; /* 清除内边距，避免变形 */
+  min-width: 24px;
+  border-radius: 50% !important;
+  padding: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -176,12 +253,10 @@
   transform: scale(1.1);
 }
 
-/* 图标大小适配按钮 */
 .toggle-btn :deep(.v-icon) {
-  font-size: 16px !important; /* 图标尺寸与按钮匹配 */
+  font-size: 16px !important;
 }
 
-/* 行程列表样式 */
 .trip-row {
   padding: 0;
   margin-bottom: 0;
