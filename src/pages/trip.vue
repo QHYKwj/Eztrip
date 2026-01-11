@@ -230,14 +230,15 @@
                 <v-switch
                   v-model="editForm.is_public"
                   color="success"
-                  inset
                   :disabled="!canEdit"
+                  inset
                   label="公开（允许他人看到并收藏）"
                 />
 
                 <v-select
                   v-model="editForm.publish_action"
                   density="comfortable"
+                  :disabled="!canEdit"
                   hint="选择提交审核/取消发布"
                   item-title="text"
                   item-value="value"
@@ -245,7 +246,6 @@
                   label="发布操作"
                   persistent-hint
                   variant="outlined"
-                  :disabled="!canEdit"
                 />
 
                 <div v-if="!canEdit" class="text-caption text-grey-darken-1 mt-2">
@@ -289,286 +289,291 @@
 </template>
 
 <script>
-import axios from 'axios'
+  import axios from 'axios'
 
-export default {
-  name: 'Trip',
-  data () {
-    return {
-      userId: null,
-      tripId: null,
-      tripDetail: null,
+  export default {
+    name: 'Trip',
+    data () {
+      return {
+        userId: null,
+        tripId: null,
+        tripDetail: null,
 
-      mapUrl: '',
-      favoriteCount: 0,
+        mapUrl: '',
+        favoriteCount: 0,
 
-      loading: false,
-      mapLoading: false,
-      error: null,
+        loading: false,
+        mapLoading: false,
+        error: null,
 
-      menuStart: false,
-      menuEnd: false,
+        menuStart: false,
+        menuEnd: false,
 
-      editing: false,
-      saving: false,
-      formValid: false,
+        editing: false,
+        saving: false,
+        formValid: false,
 
-      editForm: {
-        trip_name: '',
-        destination: '',
-        start_date: '',
-        end_date: '',
-        is_public: true,
-        publish_action: 'keep',
-      },
+        editForm: {
+          trip_name: '',
+          destination: '',
+          start_date: '',
+          end_date: '',
+          is_public: true,
+          publish_action: 'keep',
+        },
 
-      publishActions: [
-        { text: '不更改发布状态', value: 'keep' },
-        { text: '提交审核（申请发布）', value: 'submit' },
-        { text: '取消发布（变为草稿）', value: 'unpublish' },
-      ],
+        publishActions: [
+          { text: '不更改发布状态', value: 'keep' },
+          { text: '提交审核（申请发布）', value: 'submit' },
+          { text: '取消发布（变为草稿）', value: 'unpublish' },
+        ],
 
-      snack: { show: false, text: '', color: 'success' },
+        snack: { show: false, text: '', color: 'success' },
 
-      rules: {
-        required: v => !!v || '必填',
-        date: v => /^\d{4}-\d{2}-\d{2}$/.test(v) || '日期格式应为 YYYY-MM-DD',
-        dateOrder: () => true,
-      },
-    }
-  },
-
-  computed: {
-    // ✅ 是否允许编辑：只有 owner 才可以
-    canEdit () {
-      // 先用后端明确返回的 is_owner
-      if (typeof this.tripDetail?.is_owner === 'boolean') return this.tripDetail.is_owner
-      // 兜底：用 owner_user_id 比对
-      if (this.tripDetail?.owner_user_id != null && this.userId != null) {
-        return Number(this.tripDetail.owner_user_id) === Number(this.userId)
+        rules: {
+          required: v => !!v || '必填',
+          date: v => /^\d{4}-\d{2}-\d{2}$/.test(v) || '日期格式应为 YYYY-MM-DD',
+          dateOrder: () => true,
+        },
       }
-      return false
     },
 
+    computed: {
+      // ✅ 是否允许编辑：只有 owner 才可以
+      canEdit () {
+        // 先用后端明确返回的 is_owner
+        if (typeof this.tripDetail?.is_owner === 'boolean') return this.tripDetail.is_owner
+        // 兜底：用 owner_user_id 比对
+        if (this.tripDetail?.owner_user_id != null && this.userId != null) {
+          return Number(this.tripDetail.owner_user_id) === Number(this.userId)
+        }
+        return false
+      },
 
-    statusText () {
-      const s = this.tripDetail?.publish_status
-      if (s === 'draft') return '未发布（草稿）'
-      if (s === 'pending') return '待审核'
-      if (s === 'published') return '已发布'
-      if (s === 'rejected') return '未通过'
-      return '未知状态'
-    },
-    statusColor () {
-      const s = this.tripDetail?.publish_status
-      if (s === 'draft') return 'grey'
-      if (s === 'pending') return 'warning'
-      if (s === 'published') return 'success'
-      if (s === 'rejected') return 'error'
-      return 'grey'
+      statusText () {
+        const s = this.tripDetail?.publish_status
+        if (s === 'draft') return '未发布（草稿）'
+        if (s === 'pending') return '待审核'
+        if (s === 'published') return '已发布'
+        if (s === 'rejected') return '未通过'
+        return '未知状态'
+      },
+      statusColor () {
+        const s = this.tripDetail?.publish_status
+        if (s === 'draft') return 'grey'
+        if (s === 'pending') return 'warning'
+        if (s === 'published') return 'success'
+        if (s === 'rejected') return 'error'
+        return 'grey'
+      },
+
+      showFavoriteCount () {
+        return !!(this.tripDetail?.is_public && this.tripDetail?.publish_status === 'published')
+      },
+      favoriteHint () {
+        if (!this.tripDetail) return '-'
+        if (!this.tripDetail.is_public) return '未公开'
+        if (this.tripDetail.publish_status !== 'published') return `未发布（${this.statusText}）`
+        return '-'
+      },
     },
 
-    showFavoriteCount () {
-      return !!(this.tripDetail?.is_public && this.tripDetail?.publish_status === 'published')
+    watch: {
+      '$route.params.tripId' () {
+        this.syncRouteParams()
+        this.fetchTripDetail()
+      },
     },
-    favoriteHint () {
-      if (!this.tripDetail) return '-'
-      if (!this.tripDetail.is_public) return '未公开'
-      if (this.tripDetail.publish_status !== 'published') return `未发布（${this.statusText}）`
-      return '-'
-    },
-  },
 
-  watch: {
-    '$route.params.tripId' () {
+    created () {
+      this.userId = this.getUserIdFromStorage()
       this.syncRouteParams()
       this.fetchTripDetail()
     },
-  },
 
-  created () {
-    this.userId = this.getUserIdFromStorage()
-    this.syncRouteParams()
-    this.fetchTripDetail()
-  },
+    methods: {
+      syncRouteParams () {
+        this.tripId = this.$route.params.tripId
+      },
 
-  methods: {
-    syncRouteParams () {
-      this.tripId = this.$route.params.tripId
-    },
+      getUserIdFromStorage () {
+        // 修改为 sessionStorage
+        const userStr = sessionStorage.getItem('user')
+        if (!userStr) return null
+        try {
+          const user = JSON.parse(userStr)
+          return user.user_id || null
+        } catch {
+          return null
+        }
+      },
 
-    getUserIdFromStorage () {
-      const userStr = localStorage.getItem('user')
-      if (!userStr) return null
-      try {
-        const user = JSON.parse(userStr)
-        return user.user_id || null
-      } catch {
-        return null
-      }
-    },
-
-    enterEdit () {
-      // ✅ 收藏行程不可编辑：不允许进入编辑态
-      if (!this.canEdit) {
-        this.showSnack('收藏行程不可编辑', 'error')
-        return
-      }
-
-      this.editing = true
-      this.editForm.trip_name = this.tripDetail.trip_name
-      this.editForm.destination = this.tripDetail.destination
-      this.editForm.start_date = this.tripDetail.start_date
-      this.editForm.end_date = this.tripDetail.end_date
-      this.editForm.is_public = !!this.tripDetail.is_public
-      this.editForm.publish_action = 'keep'
-    },
-
-    cancelEdit () {
-      this.editing = false
-    },
-
-    showSnack (text, color = 'success') {
-      this.snack.text = text
-      this.snack.color = color
-      this.snack.show = true
-    },
-
-    async fetchTripDetail () {
-      if (!this.userId) {
-        this.error = '未登录或 user_id 丢失，请重新登录。'
-        return
-      }
-      if (!this.tripId) {
-        this.error = '未指定行程 ID。'
-        return
-      }
-
-      this.loading = true
-      this.error = null
-      this.tripDetail = null
-      this.mapUrl = ''
-      this.favoriteCount = 0
-
-      try {
-        const res = await axios.get('/api/trip/detail', {
-          params: { user_id: this.userId, trip_id: this.tripId },
-        })
-        this.tripDetail = res.data
-
-        if (this.tripDetail.lng && this.tripDetail.lat) {
-          await this.fetchMapUrl(this.tripDetail.lng, this.tripDetail.lat)
+      enterEdit () {
+        // ✅ 收藏行程不可编辑：不允许进入编辑态
+        if (!this.canEdit) {
+          this.showSnack('收藏行程不可编辑', 'error')
+          return
         }
 
-        if (this.showFavoriteCount) {
-          await this.fetchFavoriteCount()
-        }
-      } catch (error) {
-        console.error(error)
-        this.error = '获取行程详情失败'
-      } finally {
-        this.loading = false
-        // ✅ 永远不要因为 canEdit 自动进入编辑态
+        this.editing = true
+        this.editForm.trip_name = this.tripDetail.trip_name
+        this.editForm.destination = this.tripDetail.destination
+        this.editForm.start_date = this.tripDetail.start_date
+        this.editForm.end_date = this.tripDetail.end_date
+        this.editForm.is_public = !!this.tripDetail.is_public
+        this.editForm.publish_action = 'keep'
+      },
+
+      cancelEdit () {
         this.editing = false
-      }
-    },
+      },
 
-    async fetchMapUrl (lng, lat) {
-      this.mapLoading = true
-      try {
-        const res = await axios.get('/api/map/url', {
-          params: { lng, lat, zoom: 14, width: 600, height: 300 },
-        })
-        this.mapUrl = res.data.url
-      } catch (error) {
-        console.error('获取地图失败', error)
-      } finally {
-        this.mapLoading = false
-      }
-    },
+      showSnack (text, color = 'success') {
+        this.snack.text = text
+        this.snack.color = color
+        this.snack.show = true
+      },
 
-    async fetchFavoriteCount () {
-      try {
-        const res = await axios.get('/api/trip/favorite-count', {
-          params: { trip_id: this.tripId },
-        })
-        this.favoriteCount = res.data.count || 0
-      } catch (error) {
-        console.error('获取收藏人数失败', error)
-      }
-    },
-
-    async saveEdit () {
-      // ✅ 双保险：收藏行程不允许保存
-      if (!this.canEdit) {
-        this.showSnack('收藏行程不可编辑', 'error')
-        return
-      }
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.start_date)
-        || !/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.end_date)) {
-        this.showSnack('日期格式应为 YYYY-MM-DD', 'error')
-        return
-      }
-      if (new Date(this.editForm.end_date) < new Date(this.editForm.start_date)) {
-        this.showSnack('结束日期不能早于开始日期', 'error')
-        return
-      }
-
-      this.saving = true
-      try {
-        const payload = {
-          user_id: this.userId,
-          trip_id: Number(this.tripId),
-          trip_name: this.editForm.trip_name,
-          destination: this.editForm.destination,
-          start_date: this.editForm.start_date,
-          end_date: this.editForm.end_date,
-          is_public: this.editForm.is_public ? 1 : 0,
-          publish_action: this.editForm.publish_action,
+      async fetchTripDetail () {
+        // 如果没有 userId，先尝试获取一次（防止刷新页面丢失）
+        if (!this.userId) {
+          this.userId = this.getUserIdFromStorage()
         }
 
-        await axios.put('/api/trip/update', payload)
+        if (!this.tripId) {
+          this.error = '未指定行程 ID。'
+          return
+        }
 
-        this.showSnack('保存成功')
-        await this.fetchTripDetail()
-      } catch (error) {
-        console.error(error)
-        this.showSnack('保存失败，请检查后端日志', 'error')
-      } finally {
-        this.saving = false
-      }
-    },
+        this.loading = true
+        this.error = null
+        this.tripDetail = null
+        this.mapUrl = ''
+        this.favoriteCount = 0
 
-    parseYMD (ymd) {
-      if (!ymd) return null
-      const [y, m, d] = String(ymd).split('-').map(Number)
-      if (!y || !m || !d) return null
-      return new Date(y, m - 1, d)
-    },
+        try {
+          // ✅ 修改这里：直接把 tripId 拼接到 URL 后面
+          const res = await axios.get(`/api/trip/detail/${this.tripId}`)
 
-    formatYMD (val) {
-      const d = new Date(val)
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
-    },
+          // 后端返回的数据包了一层 { data: ... }
+          this.tripDetail = res.data.data
 
-    onPickStart (val) {
-      this.editForm.start_date = this.formatYMD(val)
-      if (this.editForm.end_date && this.editForm.end_date < this.editForm.start_date) {
-        this.editForm.end_date = this.editForm.start_date
-      }
-      this.menuStart = false
-    },
+          // 这里要做个字段映射，因为后端返回的是 title，前端用的是 trip_name
+          this.tripDetail.trip_name = this.tripDetail.title
 
-    onPickEnd (val) {
-      this.editForm.end_date = this.formatYMD(val)
-      this.menuEnd = false
+          // 如果需要地图经纬度逻辑，后面可以补，目前先注释掉防报错
+          if (this.tripDetail.lng && this.tripDetail.lat) {
+            await this.fetchMapUrl(this.tripDetail.lng, this.tripDetail.lat)
+          }
+
+          if (this.showFavoriteCount) {
+            await this.fetchFavoriteCount()
+          }
+        } catch (error) {
+          console.error(error)
+          this.error = '获取行程详情失败'
+        } finally {
+          this.loading = false
+          this.editing = false
+        }
+      },
+
+      async fetchMapUrl (lng, lat) {
+        this.mapLoading = true
+        try {
+          const res = await axios.get('/api/map/url', {
+            params: { lng, lat, zoom: 14, width: 600, height: 300 },
+          })
+          this.mapUrl = res.data.url
+        } catch (error) {
+          console.error('获取地图失败', error)
+        } finally {
+          this.mapLoading = false
+        }
+      },
+
+      async fetchFavoriteCount () {
+        try {
+          const res = await axios.get('/api/trip/favorite-count', {
+            params: { trip_id: this.tripId },
+          })
+          this.favoriteCount = res.data.count || 0
+        } catch (error) {
+          console.error('获取收藏人数失败', error)
+        }
+      },
+
+      async saveEdit () {
+        // ✅ 双保险：收藏行程不允许保存
+        if (!this.canEdit) {
+          this.showSnack('收藏行程不可编辑', 'error')
+          return
+        }
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.start_date)
+          || !/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.end_date)) {
+          this.showSnack('日期格式应为 YYYY-MM-DD', 'error')
+          return
+        }
+        if (new Date(this.editForm.end_date) < new Date(this.editForm.start_date)) {
+          this.showSnack('结束日期不能早于开始日期', 'error')
+          return
+        }
+
+        this.saving = true
+        try {
+          const payload = {
+            user_id: this.userId,
+            trip_id: Number(this.tripId),
+            trip_name: this.editForm.trip_name,
+            destination: this.editForm.destination,
+            start_date: this.editForm.start_date,
+            end_date: this.editForm.end_date,
+            is_public: this.editForm.is_public ? 1 : 0,
+            publish_action: this.editForm.publish_action,
+          }
+
+          await axios.put('/api/trip/update', payload)
+
+          this.showSnack('保存成功')
+          await this.fetchTripDetail()
+        } catch (error) {
+          console.error(error)
+          this.showSnack('保存失败，请检查后端日志', 'error')
+        } finally {
+          this.saving = false
+        }
+      },
+
+      parseYMD (ymd) {
+        if (!ymd) return null
+        const [y, m, d] = String(ymd).split('-').map(Number)
+        if (!y || !m || !d) return null
+        return new Date(y, m - 1, d)
+      },
+
+      formatYMD (val) {
+        const d = new Date(val)
+        const y = d.getFullYear()
+        const m = String(d.getMonth() + 1).padStart(2, '0')
+        const day = String(d.getDate()).padStart(2, '0')
+        return `${y}-${m}-${day}`
+      },
+
+      onPickStart (val) {
+        this.editForm.start_date = this.formatYMD(val)
+        if (this.editForm.end_date && this.editForm.end_date < this.editForm.start_date) {
+          this.editForm.end_date = this.editForm.start_date
+        }
+        this.menuStart = false
+      },
+
+      onPickEnd (val) {
+        this.editForm.end_date = this.formatYMD(val)
+        this.menuEnd = false
+      },
     },
-  },
-}
+  }
 </script>
 
 <style scoped>

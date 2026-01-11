@@ -126,29 +126,36 @@
         }
       },
       // 加载行程
+// 在 methods 中修改 loadTrips
+
       async loadTrips () {
-        const userId = this.getUserIdFromStorage()
-        if (!userId) {
-          console.warn('未获取到 user_id，可能尚未登录')
-          return
-        }
+        const userId = this.getUserIdFromStorage() || 1 // 暂时默认1，方便调试
 
         try {
-          const res = await axios.get('/api/trips/list', {
+          // 调用新接口
+          const res = await axios.get('/api/trip/my_trips', {
             params: { user_id: userId },
           })
-          const trips = res.data || []
 
-          // ✅ “我的行程”：owner_user_id === 当前用户
-          this.myTrips = trips
-            .filter(t => t.owner_user_id === userId)
-            .sort((a, b) => a.trip_id - b.trip_id)
+          // 后端返回格式是 { trips: [...] }
+          if (res.data && res.data.trips) {
+            // 映射后端字段到前端 Menu 组件需要的字段
+            // 后端返回: id, title, destination
+            // 前端Menu可能需要: trip_id, trip_name
+            this.myTrips = res.data.trips.map(item => ({
+              trip_id: item.id,
+              trip_name: item.title,
+              owner_user_id: userId // 标记为自己的
+            }))
+          } else {
+            this.myTrips = []
+          }
 
-          // ✅ “收藏”：当前用户在 trip_favorite 里收藏的行程（后端已经算好 is_collected）
-          // 如果你不想显示“我收藏自己的行程”，可以再加一个条件 t.owner_user_id !== userId
-          this.favoriteTrips = trips
-            .filter(t => t.is_collected && t.owner_user_id !== userId)
-            .sort((a, b) => a.trip_id - b.trip_id)
+          // 关于收藏：
+          // 目前后端 trip.py 还没写收藏接口，暂时先置空，防止报错
+          // 等后续写了 /api/trip/favorites 再补上
+          this.favoriteTrips = []
+
         } catch (error) {
           console.error('加载行程失败', error)
         }

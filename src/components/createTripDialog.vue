@@ -162,131 +162,126 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps, reactive, ref } from 'vue'
-import axios from 'axios'
+  import axios from 'axios'
+  import { computed, defineEmits, defineProps, reactive, ref } from 'vue'
 
-// --- Props & Emits ---
-const props = defineProps({
-  modelValue: Boolean,
-})
-const emit = defineEmits(['update:modelValue', 'tripCreated'])
+  // --- Props & Emits ---
+  const props = defineProps({
+    modelValue: Boolean,
+  })
+  const emit = defineEmits(['update:modelValue', 'tripCreated'])
 
-// --- State ---
-const formRef = ref(null)
-const isFormValid = ref(false)
-const loading = ref(false)
-const menuStart = ref(false)
-const menuEnd = ref(false)
+  // --- State ---
+  const formRef = ref(null)
+  const isFormValid = ref(false)
+  const loading = ref(false)
+  const menuStart = ref(false)
+  const menuEnd = ref(false)
 
-// 使用 reactive 聚合表单数据，管理更方便
-const form = reactive({
-  tripName: '',
-  destination: '',
-  startDate: null,
-  endDate: null,
-  tags: [],
-  description: '',
-  class: null, // 新增的行程类型
-})
+  // 使用 reactive 聚合表单数据，管理更方便
+  const form = reactive({
+    tripName: '',
+    destination: '',
+    startDate: null,
+    endDate: null,
+    tags: [],
+    description: '',
+    class: null, // 新增的行程类型
+  })
 
-// --- 校验规则 ---
-const rules = {
-  required: [v => !!v || '此项为必填项'],
-  dateOrder: v => {
-    if (!form.startDate || !form.endDate) return true
-    return new Date(form.endDate) >= new Date(form.startDate) || '结束日期不能早于开始日期'
-  },
-}
-
-// --- Computed: 格式化日期显示 ---
-function formatDate(date) {
-  if (!date) return ''
-  const d = new Date(date)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-const formattedStartDate = computed(() => formatDate(form.startDate))
-const formattedEndDate = computed(() => formatDate(form.endDate))
-
-// --- Methods ---
-
-// 关闭并重置
-function handleClose() {
-  emit('update:modelValue', false)
-  setTimeout(() => {
-    resetForm() // 延迟重置，避免弹窗关闭时内容突然清空的视觉闪烁
-  }, 300)
-}
-
-// 重置表单
-function resetForm() {
-  form.tripName = ''
-  form.destination = ''
-  form.startDate = null
-  form.endDate = null
-  form.tags = []
-  form.description = ''
-  form.class = null
-  if (formRef.value) formRef.value.resetValidation()
-}
-
-// 提交保存
-async function saveTrip() {
-  // 1. 触发表单校验
-  const { valid } = await formRef.value.validate()
-  if (!valid) return
-
-  loading.value = true
-
-  try {
-    // 2. 获取用户数据
-    const user = JSON.parse(sessionStorage.getItem('user'))
-    if (!user || !user.user_id) {
-      alert('请先登录')
-      loading.value = false
-      return
-    }
-
-    // 3. 格式化日期为 YYYY-MM-DD 格式
-    const formattedStartDate = formatDate(form.startDate)
-    const formattedEndDate = formatDate(form.endDate)
-
-    // 4. 将 tripData.class 转换为整数类型
-    const classType = Number.parseInt(form.class)
-
-    // 5. 创建 FormData 对象
-    const formData = new FormData()
-    formData.append('owner_user_id', user.user_id)
-    formData.append('title', form.tripName)
-    formData.append('destination', form.destination)
-    formData.append('start_date', formattedStartDate)
-    formData.append('end_date', formattedEndDate)
-    formData.append('class_type', classType)
-
-    // 6. 发送请求到后端
-    const response = await axios.post('/api/trips/create', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    })
-
-    console.log(response.data)
-
-    // 7. 创建成功后通知父组件
-    emit('tripCreated', { ...form }) // 使用解构传递数据副本
-    loading.value = false
-    handleClose()
-  } catch (error) {
-    console.error('创建行程失败', error)
-    loading.value = false
+  // --- 校验规则 ---
+  const rules = {
+    required: [v => !!v || '此项为必填项'],
+    dateOrder: v => {
+      if (!form.startDate || !form.endDate) return true
+      return new Date(form.endDate) >= new Date(form.startDate) || '结束日期不能早于开始日期'
+    },
   }
-}
 
+  // --- Computed: 格式化日期显示 ---
+  function formatDate (date) {
+    if (!date) return ''
+    const d = new Date(date)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const formattedStartDate = computed(() => formatDate(form.startDate))
+  const formattedEndDate = computed(() => formatDate(form.endDate))
+
+  // --- Methods ---
+
+  // 关闭并重置
+  function handleClose () {
+    emit('update:modelValue', false)
+    setTimeout(() => {
+      resetForm() // 延迟重置，避免弹窗关闭时内容突然清空的视觉闪烁
+    }, 300)
+  }
+
+  // 重置表单
+  function resetForm () {
+    form.tripName = ''
+    form.destination = ''
+    form.startDate = null
+    form.endDate = null
+    form.tags = []
+    form.description = ''
+    form.class = null
+    if (formRef.value) formRef.value.resetValidation()
+  }
+
+  // 提交保存
+  // 在 script setup 中
+
+  async function saveTrip() {
+    // 1. 触发表单校验
+    const { valid } = await formRef.value.validate()
+    if (!valid) return
+
+    loading.value = true
+
+    try {
+      // 2. 获取用户数据
+      const user = JSON.parse(sessionStorage.getItem('user'))
+      // 如果没有登录，为了测试方便，暂时允许不传 id (后端默认了1)，或者提示登录
+      const userId = user && user.user_id ? user.user_id : 1
+
+      // 3. 构造符合后端 Pydantic 模型 (TripCreate) 的 JSON 对象
+      const payload = {
+        tripName: form.tripName,       // 对应后端: tripName
+        destination: form.destination, // 对应后端: destination
+        startDate: formatDate(form.startDate),
+        endDate: formatDate(form.endDate),
+        description: form.description || '', // 对应后端: description
+        // 关键：后端是根据 tags 列表来判断 class 的
+        // 假设 form.tags 是 ['休闲', '美食'] 这样的数组
+        tags: form.tags || [],
+        owner_user_id: userId
+      }
+
+      // 4. 发送 JSON 请求 (axios 默认就是 json，不需要 new FormData)
+      const response = await axios.post('/api/trip/create', payload)
+
+      console.log('创建成功:', response.data)
+
+      // 5. 成功回调
+      // 注意：把后端返回的 trip_id 带上，方便父组件刷新或跳转
+      emit('tripCreated', {
+        ...form,
+        id: response.data.trip_id
+      })
+
+      loading.value = false
+      handleClose()
+
+    } catch (error) {
+      console.error('创建行程失败', error)
+      alert('创建失败，请检查网络或后端日志')
+      loading.value = false
+    }
+  }
 
 </script>
-
-
-
 
 <style scoped>
 /* 微调输入框样式，使其更清爽 */
