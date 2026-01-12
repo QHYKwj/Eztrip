@@ -89,198 +89,76 @@
         </v-alert>
       </v-col>
     </v-row>
-
-    <v-row v-else>
-      <!-- 左侧：信息 + 编辑 -->
-      <v-col cols="12" md="6">
-        <v-card class="mb-4" variant="tonal">
-          <v-card-title class="d-flex align-center justify-space-between">
-            基本信息
-            <v-chip
-              v-if="showFavoriteCount"
-              color="primary"
-              size="small"
-              variant="outlined"
-            >
-              收藏人数：{{ favoriteCount }}
-            </v-chip>
-            <v-chip
-              v-else
-              color="grey"
-              size="small"
-              variant="outlined"
-            >
-              {{ favoriteHint }}
+    <div v-else class="trip-body">
+  <v-row class="d-flex align-stretch fill-height">
+    <v-col cols="12" md="5" class="d-flex">
+        <v-card class="rounded-lg shadow-sm border w-100" elevation="0">
+          <v-card-title class="d-flex align-center justify-space-between bg-grey-lighten-4 py-3">
+            <span class="text-subtitle-1 font-weight-bold">行程基本信息</span>
+            <v-chip v-if="showFavoriteCount" color="primary" size="small" variant="flat">
+              <v-icon start icon="mdi-heart" size="14"></v-icon>
+              {{ favoriteCount }} 人收藏
             </v-chip>
           </v-card-title>
 
-          <v-card-text>
-            <!-- 展示模式 -->
+          <v-card-text class="pa-6">
             <template v-if="!editing">
-              <div class="info-row">
-                <span class="label">名称：</span>
-                <span>{{ tripDetail.trip_name }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">目的地：</span>
-                <span>{{ tripDetail.destination }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">开始日期：</span>
-                <span>{{ tripDetail.start_date }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">结束日期：</span>
-                <span>{{ tripDetail.end_date }}</span>
-              </div>
-              <div class="info-row">
-                <span class="label">更新时间：</span>
-                <span>{{ tripDetail.updated_at || '-' }}</span>
-              </div>
+              <v-row>
+                <v-col cols="12" class="py-3">
+                  <div class="text-subtitle-1 text-grey-darken-1">行程名称</div>
+                  <div class="text-h6 font-weight-bold">{{ tripDetail.trip_name }}</div>
+                </v-col>
+                
+                <v-col cols="12" class="py-3">
+                  <div class="text-subtitle-1 text-grey-darken-1">目的地</div>
+                  <div class="text-h6 font-weight-bold">
+                    <v-icon color="primary" class="mr-1">mdi-map-marker</v-icon>
+                    {{ tripDetail.destination }}
+                  </div>
+                </v-col>
 
-              <v-divider class="my-4" />
+                <v-col cols="6" class="py-3">
+                  <div class="text-subtitle-1 text-grey-darken-1">开始日期</div>
+                  <div class="text-body-1 font-weight-medium">{{ tripDetail.start_date }}</div>
+                </v-col>
 
-              <div class="info-row">
-                <span class="label">审核：</span>
-                <span>{{ statusText }}</span>
-              </div>
-              <div v-if="tripDetail.publish_status === 'rejected'" class="mt-2 text-error">
-                未通过原因：{{ tripDetail.review_comment || '（无）' }}
-              </div>
+                <v-col cols="6" class="py-3">
+                  <div class="text-subtitle-1 text-grey-darken-1">结束日期</div>
+                  <div class="text-body-1 font-weight-medium">{{ tripDetail.end_date }}</div>
+                </v-col>
+
+                <v-col cols="12" class="py-3">
+                  <div class="text-subtitle-1 text-grey-darken-1">审核状态</div>
+                  <v-chip :color="statusColor" size="small" label class="mt-1">
+                    {{ statusText }}
+                  </v-chip>
+                </v-col>
+              </v-row>
             </template>
 
-            <!-- 编辑模式 -->
             <template v-else>
-              <v-form ref="formRef" v-model="formValid" lazy-validation>
-                <v-text-field
-                  v-model="editForm.trip_name"
-                  density="comfortable"
-                  label="行程名称"
-                  :rules="[rules.required]"
-                  variant="outlined"
-                />
-                <v-text-field
-                  v-model="editForm.destination"
-                  density="comfortable"
-                  label="目的地"
-                  :rules="[rules.required]"
-                  variant="outlined"
-                />
-
-                <v-row>
-                  <!-- 开始日期 -->
-                  <v-col cols="12" md="6">
-                    <v-menu
-                      v-model="menuStart"
-                      :close-on-content-click="false"
-                      min-width="auto"
-                      transition="scale-transition"
-                    >
-                      <template #activator="{ props }">
-                        <v-text-field
-                          v-bind="props"
-                          v-model="editForm.start_date"
-                          density="comfortable"
-                          label="开始日期"
-                          prepend-inner-icon="mdi-calendar-start"
-                          readonly
-                          :rules="[rules.required]"
-                          variant="outlined"
-                        />
-                      </template>
-
-                      <v-date-picker
-                        :model-value="parseYMD(editForm.start_date)"
-                        @update:model-value="onPickStart"
-                      />
-                    </v-menu>
-                  </v-col>
-
-                  <!-- 结束日期 -->
-                  <v-col cols="12" md="6">
-                    <v-menu
-                      v-model="menuEnd"
-                      :close-on-content-click="false"
-                      min-width="auto"
-                      transition="scale-transition"
-                    >
-                      <template #activator="{ props }">
-                        <v-text-field
-                          v-bind="props"
-                          v-model="editForm.end_date"
-                          density="comfortable"
-                          label="结束日期"
-                          prepend-inner-icon="mdi-calendar-end"
-                          readonly
-                          :rules="[rules.required, rules.dateOrder]"
-                          variant="outlined"
-                        />
-                      </template>
-
-                      <v-date-picker
-                        :min="parseYMD(editForm.start_date)"
-                        :model-value="parseYMD(editForm.end_date)"
-                        @update:model-value="onPickEnd"
-                      />
-                    </v-menu>
-                  </v-col>
-                </v-row>
-
-                <!-- ✅ 收藏行程完全不可编辑：公开/发布禁用 -->
-                <v-switch
-                  v-model="editForm.is_public"
-                  color="success"
-                  :disabled="!canEdit"
-                  inset
-                  label="公开（允许他人看到并收藏）"
-                />
-
-                <v-select
-                  v-model="editForm.publish_action"
-                  density="comfortable"
-                  :disabled="!canEdit"
-                  hint="选择提交审核/取消发布"
-                  item-title="text"
-                  item-value="value"
-                  :items="publishActions"
-                  label="发布操作"
-                  persistent-hint
-                  variant="outlined"
-                />
-
-                <div v-if="!canEdit" class="text-caption text-grey-darken-1 mt-2">
-                  该行程为收藏行程：只能查看，不能修改公开与审核状态
-                </div>
-              </v-form>
-            </template>
+              </template>
           </v-card-text>
         </v-card>
       </v-col>
 
-      <!-- 右侧：地图 -->
-      <v-col class="d-flex flex-column align-center" cols="12" md="6">
-        <v-card class="w-100">
-          <v-card-title>目的地地图</v-card-title>
-          <v-card-text class="d-flex justify-center">
-            <v-skeleton-loader
-              v-if="mapLoading"
-              height="300"
-              type="image"
-              width="600"
-            />
+      <v-col cols="12" md="7" class="d-flex">
+        <v-card class="rounded-lg border w-100 d-flex flex-column" elevation="0">
+          <v-card-title class="text-subtitle-2 text-grey-darken-1">目的地地图</v-card-title>
+          <v-card-text class="pa-0 flex-grow-1">
+            <v-skeleton-loader v-if="mapLoading" type="image" height="100%" />
             <v-img
               v-else
-              class="rounded-lg elevation-2"
-              cover
-              height="300"
               :src="mapUrl"
-              width="600"
+              cover
+              class="bg-grey-lighten-3 fill-height"
+              min-height="400"
             />
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
-
+  </div>
     <!-- 保存结果提示 -->
     <v-snackbar v-model="snack.show" :color="snack.color" timeout="2200">
       {{ snack.text }}
@@ -577,13 +455,30 @@
 </script>
 
 <style scoped>
-.info-row {
-  display: flex;
-  margin-bottom: 8px;
+.v-container.fill-height {
+  min-height: calc(100vh - 64px - 48px) !important; 
+  align-items: stretch;
 }
-.label {
-  width: 90px;
-  color: #666;
-  font-weight: 600;
+
+:deep(.v-img__img) {
+  object-fit: cover;
+}
+
+.v-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-group .text-h5 {
+  margin-bottom: 24px;
+}
+
+.fill-height {
+  height: 100% !important;
+}
+.trip-body {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 64px - 48px);
 }
 </style>
