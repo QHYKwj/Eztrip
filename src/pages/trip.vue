@@ -457,13 +457,30 @@
 </script>
 
 <style scoped>
-.info-row {
-  display: flex;
-  margin-bottom: 8px;
+.v-container.fill-height {
+  min-height: calc(100vh - 64px - 48px) !important;
+  align-items: stretch;
 }
-.label {
-  width: 90px;
-  color: #666;
-  font-weight: 600;
+
+:deep(.v-img__img) {
+  object-fit: cover;
+}
+
+.v-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-group .text-h5 {
+  margin-bottom: 24px;
+}
+
+.fill-height {
+  height: 100% !important;
+}
+.trip-body {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 64px - 48px);
 }
 </style>
