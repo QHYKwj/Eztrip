@@ -1,121 +1,116 @@
-# routers/trip.py
-from fastapi import APIRouter, HTTPException, Query, Form
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Query
+from typing import Optional, List, Dict, Any
 from config.connect_db import connect_db
 
-# 创建一个新的APIRouter实例
-router = APIRouter(prefix="/api/trips",tags=["trips"])
+router = APIRouter(prefix="/api/public_trips", tags=["public_trips"])
 
-# 列出行程的路由
-@router.get("/list")
-async def list_trips(user_id: int = Query(..., description="当前登录用户 user_id")):
+
+@router.get("/search_trips")
+async def search_public_trips(
+        limit: int = Query(50, ge=1, le=200, description="返回条数"),
+        offset: int = Query(0, ge=0, description="分页偏移"),
+
+        # ✅ 搜索条件
+        destination: Optional[str] = Query(None, description="可选：目的地关键词（模糊匹配）"),
+        class_type: Optional[int] = Query(None, ge=1, le=4, description="可选：按分类过滤 1-4"),
+        days: Optional[int] = Query(None, ge=1, le=365, description="可选：按天数过滤（end-start+1）"),
+):
     """
-    返回当前用户相关的行程列表：
-    - 用户自己创建的行程（trip.owner_user_id = user_id）
-    - 用户收藏的行程（trip_favorite.user_id = user_id）
-    每条记录包含 is_collected 字段（是否被当前用户收藏）
+    搜索公开行程（广场）：
+    - 只返回 is_public=1 的行程
+    - 默认也限制 publish_status='published'（如需公开但未审核也展示，可注释掉该行）
+    - 支持 destination 模糊、class、days 精确过滤
+    - 返回：分类信息（class + class_text）、创建者、tripid/标题/目的地、days、created_at
     """
     db_conn = None
     cursor = None
+
+    CLASS_MAP = {
+        1: "休闲",
+        2: "美食",
+        3: "商务",
+        4: "家庭",
+    }
+
     try:
         db_conn = connect_db()
         if not db_conn:
             raise HTTPException(status_code=500, detail="Failed to connect database")
-
         cursor = db_conn.cursor(dictionary=True)
 
-        # 查询：用户的自有行程 + 用户收藏的行程
-        # 使用 LEFT JOIN + 条件限制当前 user 收藏记录
-        sql = """
+        where_parts = ["t.is_public = 1"]
+        params: List[Any] = []
+
+        # ✅ 建议：广场通常只展示已发布
+        # 如果你想“公开但未审核也要展示”，就把下一行注释掉
+        where_parts.append("t.publish_status = 'published'")
+
+        # destination 模糊
+        if destination is not None and destination.strip():
+            where_parts.append("t.destination LIKE %s")
+            params.append(f"%{destination.strip()}%")
+
+        # class 过滤
+        if class_type is not None:
+            where_parts.append("t.class = %s")
+            params.append(class_type)
+
+        # days 过滤：DATEDIFF + 1（包含首尾）
+        if days is not None:
+            where_parts.append("(DATEDIFF(t.end_date, t.start_date) + 1) = %s")
+            params.append(days)
+
+        where_sql = " AND ".join(where_parts)
+
+        sql = f"""
             SELECT
                 t.trip_id,
+                t.owner_user_id,
+                u.username AS creator_username,
                 t.title,
                 t.destination,
                 t.start_date,
                 t.end_date,
-                t.owner_user_id,
-                IF(tf.user_id IS NULL, 0, 1) AS is_collected
+                t.created_at,
+                t.class
             FROM trip t
-            LEFT JOIN trip_favorite tf
-              ON t.trip_id = tf.trip_id
-             AND tf.user_id = %s
-            WHERE t.owner_user_id = %s
-               OR tf.user_id IS NOT NULL
-            ORDER BY t.trip_id ASC;
+            JOIN user_info u ON u.user_id = t.owner_user_id
+            WHERE {where_sql}
+            ORDER BY t.created_at DESC
+            LIMIT %s OFFSET %s;
         """
-        cursor.execute(sql, (user_id, user_id))
+        params.extend([limit, offset])
+
+        cursor.execute(sql, tuple(params))
         rows = cursor.fetchall() or []
 
-        # 转成前端友好格式
-        trips = []
+        result: List[Dict[str, Any]] = []
         for r in rows:
-            trips.append({
+            # days = end - start + 1（包含首尾）
+            try:
+                days_val = (r["end_date"] - r["start_date"]).days + 1
+            except Exception:
+                days_val = None
+
+            cls = r.get("class")
+            result.append({
                 "trip_id": r["trip_id"],
-                "trip_name": r["title"],  # 前端期望的字段名：trip_name
-                "destination": r["destination"],
-                "start_date": str(r["start_date"]),
-                "end_date": str(r["end_date"]),
                 "owner_user_id": r["owner_user_id"],
-                "is_collected": bool(r["is_collected"]),
+                "creator_username": r.get("creator_username"),
+                "title": r["title"],
+                "destination": r["destination"],
+                "class": cls,
+                "class_text": CLASS_MAP.get(int(cls)) if cls is not None else None,
+                "days": days_val,
+                "created_at": str(r["created_at"]),
             })
 
-        return trips
+        return result
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"获取行程列表失败: {str(e)}")
-    finally:
-        if cursor:
-            cursor.close()
-        if db_conn and db_conn.is_connected():
-            db_conn.close()
-
-
-# 创建行程的路由
-@router.post("/create")
-async def create_trip(
-        owner_user_id: int = Form(...),
-        title: str = Form(...),
-        destination: str = Form(...),
-        start_date: str = Form(...),  # 'YYYY-MM-DD'
-        end_date: str = Form(...),    # 'YYYY-MM-DD'
-        class_type: int = Form(...),  # 行程类型字段，1: 休闲, 2: 美食, 3: 商务, 4: 家庭
-):
-    """
-    创建一个新的行程（草稿状态）。
-    """
-    db_conn = None
-    cursor = None
-    try:
-        db_conn = connect_db()
-        if not db_conn:
-            raise HTTPException(status_code=500, detail="Failed to connect database")
-
-        cursor = db_conn.cursor(dictionary=True)
-
-        sql = """
-            INSERT INTO trip
-              (owner_user_id, title, destination, start_date, end_date, class)
-            VALUES
-              (%s, %s, %s, %s, %s, %s);
-        """
-        cursor.execute(sql, (owner_user_id, title, destination, start_date, end_date, class_type))
-        db_conn.commit()
-
-        new_id = cursor.lastrowid
-
-        return {
-            "message": "Trip created successfully",
-            "trip_id": new_id,
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        if db_conn:
-            db_conn.rollback()
-        raise HTTPException(status_code=500, detail=f"创建行程失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"搜索公开行程失败: {str(e)}")
     finally:
         if cursor:
             cursor.close()

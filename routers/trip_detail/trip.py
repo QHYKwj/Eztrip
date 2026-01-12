@@ -1,0 +1,313 @@
+# routers/trip_detail/trip.py
+# routers/trip_detail/trip.py
+from fastapi import APIRouter, HTTPException, Query
+from config.connect_db import connect_db
+import httpx
+from datetime import datetime, date
+from settings import AMAP_WEB_KEY
+from fastapi import APIRouter, HTTPException, Query
+import os
+import urllib.parse
+from pydantic import BaseModel
+from config.connect_db import connect_db
+from datetime import datetime
+
+router = APIRouter(prefix="/api/trip", tags=["trip_details"])
+
+
+async def geocode_destination(destination: str):
+    """destination -> (lng, lat) via AMap geocode"""
+    if not destination or not destination.strip():
+        return None, None
+
+    url = "https://restapi.amap.com/v3/geocode/geo"
+    params = {"key": AMAP_WEB_KEY, "address": destination, "output": "JSON"}
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:
+        return None, None
+
+    if str(data.get("status")) != "1":
+        return None, None
+
+    geocodes = data.get("geocodes") or []
+    if not geocodes:
+        return None, None
+
+    loc = geocodes[0].get("location")
+    if not loc or "," not in loc:
+        return None, None
+
+    lng_str, lat_str = loc.split(",", 1)
+    try:
+        return float(lng_str), float(lat_str)
+    except Exception:
+        return None, None
+
+
+def to_str(x):
+    """把 date/datetime 转字符串"""
+    if x is None:
+        return None
+    if isinstance(x, datetime):
+        return x.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(x, date):
+        return x.strftime("%Y-%m-%d")
+    return str(x)
+
+
+@router.get("/detail")
+async def trip_detail(
+        user_id: int = Query(..., description="当前登录用户 user_id"),
+        trip_id: int = Query(..., description="行程 id"),
+):
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="Failed to connect database")
+        cursor = db_conn.cursor(dictionary=True)
+
+        sql = """
+            SELECT
+                t.trip_id,
+                t.owner_user_id,
+                t.title,
+                t.destination,
+                t.start_date,
+                t.end_date,
+                t.created_at,
+                t.updated_at,
+                t.publish_status,
+                t.review_comment,
+                t.is_public,
+                t.class,
+                tf.user_id AS fav_user_id,
+                IF(tf.user_id IS NULL, 0, 1) AS is_collected
+            FROM trip t
+            LEFT JOIN trip_favorite tf
+              ON tf.trip_id = t.trip_id AND tf.user_id = %s
+            WHERE t.trip_id = %s
+              AND (t.owner_user_id = %s OR tf.user_id IS NOT NULL)
+            LIMIT 1;
+        """
+        cursor.execute(sql, (user_id, trip_id, user_id))
+        trip = cursor.fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found or no permission")
+
+        lng, lat = await geocode_destination(trip["destination"])
+
+        owner_id = int(trip["owner_user_id"])
+        uid = int(user_id)
+
+        return {
+            "trip_id": int(trip["trip_id"]),
+            "owner_user_id": owner_id,
+
+            "trip_name": trip["title"],
+            "destination": trip["destination"],
+            "start_date": to_str(trip["start_date"]),
+            "end_date": to_str(trip["end_date"]),
+            "created_at": to_str(trip["created_at"]),
+            "updated_at": to_str(trip["updated_at"]),
+
+            "publish_status": trip["publish_status"],
+            "review_comment": trip.get("review_comment"),
+            "is_public": int(trip["is_public"]) == 1,
+
+            "is_collected": bool(trip["is_collected"]),
+            "is_owner": owner_id == uid,              # ✅ 关键：这里必须正确
+            "is_favorited": trip["fav_user_id"] is not None,
+
+            "class": str(trip["class"]) if trip["class"] is not None else None,
+            "lng": lng,
+            "lat": lat,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取行程详情失败: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+
+# 高德静态地图基础 URL
+AMAP_STATIC_BASE_URL = "https://restapi.amap.com/v3/staticmap"
+
+
+@router.get("/map/url")
+async def get_map_url(
+        lng: float = Query(..., description="地图中心点经度，如 116.397428"),
+        lat: float = Query(..., description="地图中心点纬度，如 39.90923"),
+        zoom: int = Query(14, ge=1, le=18, description="缩放等级 1-18"),
+        width: int = Query(600, ge=1, le=1024, description="图片宽度，最大 1024"),
+        height: int = Query(300, ge=1, le=1024, description="图片高度，最大 1024"),
+        label: str = Query("A", description="标记点上的文本，如 A/B/1"),
+):
+    """
+    返回一个高德静态地图 URL，前端直接用 <img :src="url"> 即可显示。
+    """
+
+    # 1. 检查 key 是否正确配置
+    if not AMAP_WEB_KEY or AMAP_WEB_KEY == "YOUR_AMAP_WEB_SERVICE_KEY_HERE":
+        raise HTTPException(
+            status_code=500,
+            detail="高德 Web 服务 Key 未配置，请在环境变量 AMAP_WEB_KEY 中设置，或者修改 routers/map.py 中 AMAP_WEB_KEY。",
+        )
+
+    # 2. 组装静态地图参数
+    center = f"{lng},{lat}"            # 中心点坐标
+    size = f"{width}*{height}"         # 图片大小
+    label = label or "A"
+
+    # markers 格式：
+    # markers=mid,0xFF0000,A:116.397428,39.90923
+    marker_style = f"mid,0xFF0000,{label}"
+    markers = f"{marker_style}:{center}"
+
+    query_params = {
+        "key": AMAP_WEB_KEY,
+        "location": center,
+        "zoom": str(zoom),
+        "size": size,
+        "markers": markers,
+        # 以后如果要加 paths、labels 等，可以继续往这里加
+    }
+
+    url = f"{AMAP_STATIC_BASE_URL}?{urllib.parse.urlencode(query_params)}"
+
+    # 统一返回格式
+    return {"url": url}
+
+
+class TripUpdateBody(BaseModel):
+    user_id: int
+    trip_id: int
+    trip_name: str
+    destination: str
+    start_date: str  # YYYY-MM-DD
+    end_date: str    # YYYY-MM-DD
+    is_public: int   # 0/1
+    publish_action: str  # keep / submit / unpublish
+
+
+def _parse_ymd(s: str) -> datetime:
+    try:
+        return datetime.strptime(s, "%Y-%m-%d")
+    except Exception:
+        raise HTTPException(status_code=400, detail="日期格式应为 YYYY-MM-DD")
+
+
+@router.put("/update")
+async def update_trip(body: TripUpdateBody):
+    db_conn = None
+    cursor = None
+    try:
+        if body.publish_action not in ("keep", "submit", "unpublish"):
+            raise HTTPException(status_code=400, detail="Invalid publish_action")
+
+        # ✅ 日期校验
+        start_dt = _parse_ymd(body.start_date)
+        end_dt = _parse_ymd(body.end_date)
+        if end_dt < start_dt:
+            raise HTTPException(status_code=400, detail="结束日期不能早于开始日期")
+
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="Failed to connect database")
+        cursor = db_conn.cursor(dictionary=True)
+
+        # ✅ 1) 权限：必须是 owner 才能改（收藏行程直接禁止）
+        cursor.execute(
+            "SELECT owner_user_id, publish_status FROM trip WHERE trip_id=%s",
+            (body.trip_id,)
+        )
+        t = cursor.fetchone()
+        if not t:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        if int(t["owner_user_id"]) != int(body.user_id):
+            raise HTTPException(status_code=403, detail="No permission (favorite trip is read-only)")
+
+        current_status = t["publish_status"]
+
+        # ✅ 2) 处理 publish_action -> publish_status
+        new_status = None
+        if body.publish_action == "submit":
+            # 只允许 draft/rejected 提交审核（你也可以放宽）
+            if current_status not in ("draft", "rejected"):
+                raise HTTPException(status_code=400, detail="当前状态不可提交审核")
+            new_status = "pending"
+        elif body.publish_action == "unpublish":
+            new_status = "draft"
+
+        # ✅ 3) 更新
+        if new_status:
+            cursor.execute("""
+                UPDATE trip
+                SET title=%s, destination=%s, start_date=%s, end_date=%s,
+                    is_public=%s, publish_status=%s
+                WHERE trip_id=%s
+            """, (
+                body.trip_name, body.destination, body.start_date, body.end_date,
+                int(body.is_public), new_status, body.trip_id
+            ))
+        else:
+            cursor.execute("""
+                UPDATE trip
+                SET title=%s, destination=%s, start_date=%s, end_date=%s,
+                    is_public=%s
+                WHERE trip_id=%s
+            """, (
+                body.trip_name, body.destination, body.start_date, body.end_date,
+                int(body.is_public), body.trip_id
+            ))
+
+        db_conn.commit()
+        return {"message": "Trip updated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db_conn:
+            db_conn.rollback()
+        raise HTTPException(status_code=500, detail=f"更新行程失败: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+@router.get("/favorite-count", summary="获取行程收藏人数")
+async def favorite_count(trip_id: int = Query(...)):
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="Failed to connect database")
+        cursor = db_conn.cursor(dictionary=True)
+
+        cursor.execute("SELECT COUNT(*) AS cnt FROM trip_favorite WHERE trip_id=%s", (trip_id,))
+        row = cursor.fetchone() or {"cnt": 0}
+        return {"trip_id": trip_id, "count": int(row["cnt"])}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取收藏人数失败: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()

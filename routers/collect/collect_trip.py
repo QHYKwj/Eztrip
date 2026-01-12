@@ -27,12 +27,12 @@ async def add_trip_favorite(favorite_data: TripFavoriteRequest):
         # 2. 校验：用户是否存在（查询user_info表）
         cursor.execute("SELECT user_id FROM user_info WHERE user_id=%s", (user_id,))
         if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail=f"用户ID {user_id} 不存在")
+            raise HTTPException(status_code=403, detail=f"用户ID {user_id} 不存在")
 
         # 3. 校验：行程是否存在且状态合法（查询trip表，仅已发布行程可收藏）
         cursor.execute("""
             SELECT trip_id FROM trip 
-            WHERE trip_id=%s AND publish_status='published' AND is_public=1
+            WHERE trip_id=%s 
         """, (trip_id,))
         if not cursor.fetchone():
             raise HTTPException(
@@ -139,6 +139,57 @@ async def remove_trip_favorite(favorite_data: TripFavoriteRequest):
         raise HTTPException(status_code=500, detail=f"取消收藏失败：{str(e)}")
     finally:
         # 释放数据库资源
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+# ✅ 新增：查询用户收藏的所有 trip_id
+class UserFavoriteListRequest(BaseModel):
+    user_id: int
+
+@router.post("/favorite/list", summary="获取用户收藏的行程ID列表")
+async def list_user_favorites(data: UserFavoriteListRequest):
+    db_conn = None
+    cursor = None
+    user_id = data.user_id
+
+    try:
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="数据库连接失败")
+        cursor = db_conn.cursor(dictionary=True)
+
+        # 1) 校验用户是否存在
+        cursor.execute("SELECT user_id FROM user_info WHERE user_id=%s", (user_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail=f"用户ID {user_id} 不存在")
+
+        # 2) 查收藏列表（只返回trip_id）
+        cursor.execute("""
+            SELECT trip_id
+            FROM trip_favorite
+            WHERE user_id=%s
+            ORDER BY created_at DESC
+        """, (user_id,))
+        rows = cursor.fetchall() or []
+        trip_ids = [r["trip_id"] for r in rows]
+
+        return {
+            "code": 200,
+            "message": "获取收藏列表成功",
+            "data": {
+                "user_id": user_id,
+                "trip_ids": trip_ids,
+                "count": len(trip_ids)
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取收藏列表失败：{str(e)}")
+    finally:
         if cursor:
             cursor.close()
         if db_conn and db_conn.is_connected():
