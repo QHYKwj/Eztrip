@@ -138,7 +138,7 @@ export default {
         return
       }
       try {
-        const res = await axios.get(`/api/profile/${stored.user_id}`)
+        const res = await axios.get(`/api/user/profile/${stored.user_id}`)
         const data = res.data
         this.user.username = data.username
         this.user.avatar = data.avatar

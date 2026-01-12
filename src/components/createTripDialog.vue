@@ -233,53 +233,48 @@
   // 提交保存
   // 在 script setup 中
 
-  async function saveTrip() {
-    // 1. 触发表单校验
+  async function saveTrip () {
     const { valid } = await formRef.value.validate()
     if (!valid) return
 
     loading.value = true
 
     try {
-      // 2. 获取用户数据
-      const user = JSON.parse(sessionStorage.getItem('user'))
-      // 如果没有登录，为了测试方便，暂时允许不传 id (后端默认了1)，或者提示登录
-      const userId = user && user.user_id ? user.user_id : 1
+      const user = JSON.parse(sessionStorage.getItem('user') || 'null')
+      const userId = user && user.user_id ? user.user_id : null
 
-      // 3. 构造符合后端 Pydantic 模型 (TripCreate) 的 JSON 对象
-      const payload = {
-        tripName: form.tripName,       // 对应后端: tripName
-        destination: form.destination, // 对应后端: destination
-        startDate: formatDate(form.startDate),
-        endDate: formatDate(form.endDate),
-        description: form.description || '', // 对应后端: description
-        // 关键：后端是根据 tags 列表来判断 class 的
-        // 假设 form.tags 是 ['休闲', '美食'] 这样的数组
-        tags: form.tags || [],
-        owner_user_id: userId
+      if (!userId) {
+        alert('请先登录再创建行程')
+        loading.value = false
+        return
       }
 
-      // 4. 发送 JSON 请求 (axios 默认就是 json，不需要 new FormData)
-      const response = await axios.post('/api/trip/create', payload)
+      const payload = {
+        owner_user_id: userId,
+        title: form.tripName,
+        destination: form.destination,
+        start_date: formatDate(form.startDate),
+        end_date: formatDate(form.endDate),
+        class_type: Number(form.class),          // ✅ 注意：chip value 是字符串，要转数字
+        remarks: form.description || null,       // ✅ remarks
+      }
 
-      console.log('创建成功:', response.data)
+      const response = await axios.post('/api/user/trips/create', payload)
 
-      // 5. 成功回调
-      // 注意：把后端返回的 trip_id 带上，方便父组件刷新或跳转
       emit('tripCreated', {
-        ...form,
-        id: response.data.trip_id
+        ...payload,
+        trip_id: response.data.trip_id,
       })
 
-      loading.value = false
       handleClose()
-
     } catch (error) {
       console.error('创建行程失败', error)
       alert('创建失败，请检查网络或后端日志')
+    } finally {
       loading.value = false
     }
   }
+
 
 </script>
 

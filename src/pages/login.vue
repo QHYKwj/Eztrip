@@ -89,7 +89,7 @@
           formData.append('username', this.username)
           formData.append('password', this.password)
 
-          const res = await axios.post('/api/login', formData, {
+          const res = await axios.post('/api/user/login', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           })
 

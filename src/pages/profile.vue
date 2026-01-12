@@ -241,7 +241,7 @@ export default {
       this.loading = true
       this.error = null
       try {
-        const res = await axios.get(`/api/profile/${user.user_id}`)
+        const res = await axios.get(`/api/user/profile/${user.user_id}`)
         const data = res.data
 
         this.profile = {
@@ -310,7 +310,7 @@ export default {
         formData.append('email', this.form.email || '')
         formData.append('birthday', this.form.birthday || '')
 
-        await axios.put(`/api/profile/${this.profile.user_id}`, formData, {
+        await axios.put(`/api/user/profile/${this.profile.user_id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
 
