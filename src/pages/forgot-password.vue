@@ -19,7 +19,7 @@
                     label="Name"
                     required
                     :rules="nameRules"
-                    type="name"
+                    type="text"
                   />
                   <v-text-field
                     v-model="email"
@@ -37,7 +37,7 @@
                     :rules="passwordRules"
                     type="password"
                   />
-                  <v-btn style="margin-bottom: 10px" type="submit" @click="register">Save</v-btn>
+                  <v-btn style="margin-bottom: 10px" @click="resetPassword">Save</v-btn>
                   <v-spacer />
                 </v-form>
               </v-card-text>
@@ -49,46 +49,87 @@
   </div>
 </template>
 <script>
-  export default {
-    data: () => ({
+import axios from 'axios'
+
+export default {
+  data () {
+    return {
       valid: true,
+
+      name: 'zhangsan',
       email: '123@123.com',
+      password: '',
+
+      nameRules: [
+        v => !!v || 'Name is required',
+      ],
+
       emailRules: [
         v => !!v || 'E-mail is required',
         v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
       ],
-      password: '',
-      checkbox: false,
-      name: 'zhangsan',
-      nameRules: [
-        v => !!v || 'Name is required',
-        v => /^[a-zA-Z]+(([',. -][a-zA-Z ])?[a-zA-Z]*)*$/.test(v) || 'Name must contain only letters',
+
+      passwordRules: [
+        v => !!v || 'Password is required',
+        
       ],
-    }),
-    computed: {
-      nameErrors () {
-        return this.nameRules.filter(rule => !rule(this.name)).map(rule => rule(this.name))
-      },
-      emailErrors () {
-        return this.emailRules.filter(rule => !rule(this.email)).map(rule => rule(this.email))
-      },
+    }
+  },
+
+  computed: {
+    nameErrors () {
+      return this.nameRules
+        .filter(rule => rule(this.name) !== true)
+        .map(rule => rule(this.name))
     },
-    methods: {
-      register () {
-        if (this.$refs.form.validate()) {
-          if (!this.email || !this.password || !this.name) {
-            alert('Login failed. Please check your email, password, and agree to the terms.')
-          } else {
-            console.log('Logging in with email:', this.email)
-          // TODO: Implement login functionality
-          }
-        } else {
-          alert('Login failed. Please check your email, password, and agree to the terms.')
-        }
-      },
+    emailErrors () {
+      return this.emailRules
+        .filter(rule => rule(this.email) !== true)
+        .map(rule => rule(this.email))
     },
-  }
+    passwordErrors () {
+      return this.passwordRules
+        .filter(rule => rule(this.password) !== true)
+        .map(rule => rule(this.password))
+    },
+  },
+
+  methods: {
+    async resetPassword () {
+      const { valid } = await this.$refs.form.validate()
+      if (!valid) {
+        alert('请检查输入内容')
+        return
+      }
+
+      const formData = new URLSearchParams()
+      formData.append('username', this.name)
+      formData.append('email', this.email)
+      formData.append('new_password', this.password)
+
+      try {
+            await axios.post(
+      '/api/user/change_password',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    )
+
+
+        alert('密码重置成功，请重新登录')
+        this.$router.push('/')
+      } catch (err) {
+        console.error(err)
+        alert('重置失败，请稍后重试')
+      }
+    },
+  },
+}
 </script>
+
 <style scoped>
 /* 背景部分 */
 html, body {
@@ -191,3 +232,5 @@ html, body {
   margin-bottom: 10px;
 }
 </style>
+
+
