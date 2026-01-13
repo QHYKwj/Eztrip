@@ -11,7 +11,7 @@
               <img alt="Logo" class="logo" src="@/assets/logo2.svg">
               <v-card-title>Register</v-card-title>
               <v-card-text>
-                <v-form ref="form" v-model="valid" lazy-validation>
+                <v-form ref="formRef" v-model="valid" lazy-validation> 
                   <v-text-field
                     v-model="name"
                     :counter="10"
@@ -19,7 +19,7 @@
                     label="Name"
                     required
                     :rules="nameRules"
-                    type="name"
+                    type="text"
                   />
                   <v-text-field
                     v-model="email"
@@ -40,13 +40,12 @@
                   <v-text-field
                     v-model="password2"
                     :error-messages="password2Errors"
-                    label="Password2"
+                    label="Confirm Password"
                     required
-                    :rules="password2Rules"
-                    type="password2"
+                    :rules="getPassword2Rules()" 
+                    type="password"
                   />
                   <v-btn style="margin-bottom: 10px" type="submit" @click="register">register</v-btn>
-                  <v-spacer />
                   <v-spacer />
                   Already have an account?
                   <v-btn color="primary" href="/login" style="margin-left: 10px">
@@ -61,70 +60,94 @@
     </div>
   </div>
 </template>
+
 <script>
-  import API from '@/config/api'
-  export default {
-    data: () => ({
-      currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
-      valid: true,
-      email: '',
-      emailRules: [
-        v => !!v || 'E-mail is required',
-        v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
-      ],
-      password: '',
-      passwordRules: [
-        v => !!v || 'Password is required',
-      ],
-      checkbox: false,
-      password2: '',
-      password2Rules: [
-        v => !!v || 'Password is required',
-        function (v) {
-          return v === this.password || 'Passwords must match'
-        }, // 使用普通函数而不是箭头函数
-      ],
-      name: '',
-      nameRules: [
-        v => !!v || 'Name is required',
-        v => /^[a-zA-Z]+(([',. -][a-zA-Z ])?[a-zA-Z]*)*$/.test(v) || 'Name must contain only letters',
-      ],
-    }),
-    computed: {
-      nameErrors () {
-        return this.nameRules.filter(rule => !rule(this.name)).map(rule => rule(this.name))
-      },
-      emailErrors () {
-        return this.emailRules.filter(rule => !rule(this.email)).map(rule => rule(this.email))
-      },
-      passwordErrors () {
-        return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
-      },
+import axios from 'axios'
+
+export default {
+  name: 'Register', 
+  data: () => ({
+    currentUser: JSON.parse(localStorage.getItem('currentUser')) || null,
+    valid: true,
+    email: '',
+    emailRules: [
+      v => !!v || 'E-mail is required',
+      v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
+    ],
+    password: '',
+    passwordRules: [
+      v => !!v || 'Password is required',
+    ],
+    password2: '',
+    name: '',
+    nameRules: [
+      v => !!v || 'Name is required',
+      v => /^[a-zA-Z]+(([',. -][a-zA-Z ])?[a-zA-Z]*)*$/.test(v) || 'Name must contain only letters',
+    ],
+  }),
+  computed: {
+    nameErrors() {
+      return this.nameRules.filter(rule => !rule(this.name)).map(rule => rule(this.name))
     },
-    // mounted () {
-    //   const savedUser = localStorage.getItem('currentUser');
-    //   if (savedUser) {
-    //     this.currentUser = JSON.parse(savedUser);
-    //     updateUserInfo.call(this);
-    //     showPage.call(this, 'mainPage');
-    //     initWebSocket.call(this);
-    //   }
-    //   document.querySelector('#registerPage form').addEventListener('submit', function (e) {
-    //     e.preventDefault();
-    //     this.register();
-    //   }.bind(this));
-    // },
-    methods: {
-      async register () {
-        if (this.$refs.form.validate() && (!this.email || !this.password || !this.password2 || !this.name)) {
-          alert('注册失败。请检查您的邮箱、密码和用户名。')
+    emailErrors() {
+      return this.emailRules.filter(rule => !rule(this.email)).map(rule => rule(this.email))
+    },
+    passwordErrors() {
+      return this.passwordRules.filter(rule => !rule(this.password)).map(rule => rule(this.password))
+    },
+    password2Errors() {
+      const rules = this.getPassword2Rules()
+      return rules.filter(rule => !rule(this.password2)).map(rule => rule(this.password2))
+    }
+  },
+  methods: {
+    getPassword2Rules() {
+      return [
+        v => !!v || 'Confirm Password is required',
+        v => v === this.password || 'Passwords must match'
+      ]
+    },
+    async register() {
+      const isFormValid = await this.$refs.formRef.validate()
+      if (!isFormValid) {
+        alert('Please fill in the form correctly!')
+        return
+      }
+
+      try {
+        const params = new URLSearchParams()
+        params.append('username', this.name)
+        params.append('email', this.email)
+        params.append('password', this.password)
+        params.append('confirm_password', this.password2)
+
+        const response = await axios.post('/api/user/register', params, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        })
+
+        alert('Register successful! Please login.')
+        window.location.href = '/login'
+
+      } catch (error) {
+        let errorMsg = 'Register failed! '
+        if (error.response) {
+          errorMsg += error.response.data.detail || 'Unknown error'
+        } else if (error.request) {
+          errorMsg += 'Cannot connect to server'
+        } else {
+          errorMsg += error.message
         }
-      },
+        alert(errorMsg)
+      }
     },
-  }
+  },
+}
 </script>
+
 <style scoped>
-/* 背景部分 */
+
 html, body {
   height: 100%;
   margin: 0;
@@ -182,16 +205,15 @@ html, body {
 }
 
 .background2 {
-  position: absolute; /* 确保它覆盖在 background 上 */
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8),rgba(70, 130, 180, 0.8)); /* 蓝紫渐变色 */
-  z-index: 2; /* 在背景和内容之间 */
+  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8),rgba(70, 130, 180, 0.8));
+  z-index: 2;
 }
 
-/* 让登录框居中并变成正方形 */
 .content {
   position: relative;
   z-index: 3;
@@ -203,10 +225,10 @@ html, body {
   margin: 0 auto;
   padding: 30px;
   border-radius: 15px;
-  background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
-  flex-direction: column; /* 垂直排列元素 */
-  align-items: center; /* 水平居中对齐 */
-  justify-content: center; /* 垂直居中对齐 */
+  background-color: rgba(255, 255, 255, 0.8);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .logo {
@@ -220,7 +242,6 @@ html, body {
   height: 100vh;
 }
 
-/* 其他样式 */
 .v-btn {
   width: 100%;
   margin-bottom: 10px;
