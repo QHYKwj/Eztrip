@@ -102,7 +102,7 @@ class TripCreateBody(BaseModel):
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
     class_type: int = Field(..., ge=1, le=4)
-    remarks: str | None = None   # ✅ 新增
+    remarks: Optional[str] = None  # ✅ 新增
 # 创建行程的路由
 @router.post("/create")
 async def create_trip(body: TripCreateBody):
