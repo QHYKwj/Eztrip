@@ -138,7 +138,7 @@
             </v-data-table>
           </v-card-text>
 
-          <!-- 内容审核面板（仅修改此部分） -->
+          <!-- 内容审核面板 -->
           <v-card-text v-if="activeSidebarItem === 1">
             <v-data-table
               :items="contents"
@@ -183,29 +183,21 @@
 
           <!-- 公告管理面板 -->
           <v-card-text v-if="activeSidebarItem === 2">
-            <!-- 搜索和操作区 -->
             <div class="user-controls">
-              <v-text-field
-                v-model="announcementSearch"
-                label="搜索公告"
-                prepend-icon="mdi-magnify"
-                style="width: 300px;"
-              />
               <v-btn
                 style="background-color: #742DD8; color: white;"
                 @click="openAnnouncementDialog"
               >
-                <v-icon left>mdi-plus</v-icon>发布公告
+                <v-icon left>mdi-plus</v-icon>创建公告
               </v-btn>
             </div>
 
-            <!-- 公告表格 -->
+            <!-- 公告表格-->
             <v-data-table
               :items="announcements"
-              :search="announcementSearch"
               :headers="announcementHeaders"
               class="announcement-table"
-              item-key="id"
+              item-key="notice_id"
               :items-per-page-options="[10, 20, 50]"
             >
               <template v-slot:item.published="{ item }">
@@ -218,7 +210,7 @@
                   <v-btn icon small @click="editAnnouncement(item)" style="color: #675096;">
                     <v-icon>mdi-pencil</v-icon>
                   </v-btn>
-                  <v-btn icon small @click="deleteAnnouncement(item.id)" style="color: #e53935;">
+                  <v-btn icon small @click="deleteAnnouncement(item.notice_id)" style="color: #e53935;">
                     <v-icon>mdi-delete-outline</v-icon>
                   </v-btn>
                   <v-btn
@@ -236,6 +228,46 @@
               </template>
             </v-data-table>
           </v-card-text>
+
+          <!-- 公告编辑对话框 -->
+          <v-dialog v-model="announcementDialogOpen" max-width="800px">
+            <v-card>
+              <v-card-title>{{ editingAnnouncement ? '编辑公告' : '创建公告' }}</v-card-title>
+              <v-card-text>
+                <v-form>
+                  <!-- 标题输入框 -->
+                  <v-text-field
+                    v-model="currentAnnouncement.title"
+                    label="公告标题"
+                    required
+                    full-width
+                    placeholder="请输入公告标题"
+                  />
+                  <!-- 内容输入框 -->
+                  <v-textarea
+                    v-model="currentAnnouncement.content"
+                    label="公告内容"
+                    required
+                    rows="8"
+                    full-width
+                    placeholder="请输入公告详细内容"
+                    style="margin-top: 16px;"
+                  />
+                </v-form>
+              </v-card-text>
+              <v-card-actions>
+                <v-btn @click="announcementDialogOpen = false">取消</v-btn>
+                <v-btn
+                  style="background-color: #742DD8; color: white;"
+                  @click="saveAnnouncement"
+                  :disabled="announcementLoading"
+                >
+                  <v-icon v-if="announcementLoading" small>mdi-loading</v-icon>
+                  保存
+                </v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-dialog>
         </v-card>
       </v-container>
     </div>
@@ -282,52 +314,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- 公告编辑对话框 -->
-    <v-dialog v-model="announcementDialogOpen" max-width="800px">
-      <v-card>
-        <v-card-title>{{ editingAnnouncement ? '编辑公告' : '发布公告' }}</v-card-title>
-        <v-card-text>
-          <v-form>
-            <!-- 标题输入框：绑定currentAnnouncement.title，必填 -->
-            <v-text-field
-              v-model="currentAnnouncement.title"
-              label="公告标题"
-              required
-              full-width
-              placeholder="请输入公告标题"
-            />
-            <!-- 内容输入框：绑定currentAnnouncement.content，必填 -->
-            <v-textarea
-              v-model="currentAnnouncement.content"
-              label="公告内容"
-              required
-              rows="8"
-              full-width
-              placeholder="请输入公告详细内容"
-              style="margin-top: 16px;"
-            />
-            <!-- 立即发布开关：绑定currentAnnouncement.published -->
-            <v-switch
-              v-model="currentAnnouncement.published"
-              label="立即发布"
-              color="#742DD8"
-              style="margin-top: 16px;"
-            />
-          </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn @click="announcementDialogOpen = false">取消</v-btn>
-          <v-btn
-            style="background-color: #742DD8; color: white;"
-            @click="saveAnnouncement"
-            :disabled="announcementLoading"
-          >
-            <v-icon v-if="announcementLoading" small>mdi-loading</v-icon>
-            保存
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
   </div>
 </template>
 
@@ -341,7 +327,6 @@ export default {
       // 基础状态
       activeSidebarItem: 0,
       searchQuery: "",
-      announcementSearch: "",
       unreadNotifications: 3,
       userDialogOpen: false,
       announcementDialogOpen: false,
@@ -381,7 +366,7 @@ export default {
       currentAnnouncement: {
         title: "",
         content: "",
-        published: false // 对应后端 is_active（true=1，false=0）
+        notice_id: null
       },
 
       // 表格头部配置（适配后端字段）
@@ -406,8 +391,8 @@ export default {
       announcementHeaders: [
         { text: "公告ID", value: "notice_id", sortable: true, align: "start" },
         { text: "公告标题", value: "title", sortable: true, align: "start" },
+        { text: "发布时间", value: "created_at", sortable: true, align: "center" },
         { text: "发布状态", value: "published", sortable: true, align: "center" },
-        { text: "发布时间", value: "create_time", sortable: true, align: "center" },
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
 
@@ -471,45 +456,6 @@ export default {
     },
     updateUserStatus(item) {
       this.$toast?.success(`用户 ${item.username} 状态已更新`);
-    },
-
-    // ========== 公告管理功能 ==========
-    openAnnouncementDialog() {
-      this.editingAnnouncement = null;
-      this.currentAnnouncement = { title: "", content: "", published: false };
-      this.announcementDialogOpen = true;
-    },
-    editAnnouncement(item) {
-      this.editingAnnouncement = item.id;
-      this.currentAnnouncement = { ...item };
-      this.announcementDialogOpen = true;
-    },
-    saveAnnouncement() {
-      const now = new Date().toISOString().split("T")[0];
-      if (this.editingAnnouncement) {
-        const index = this.announcements.findIndex(a => a.id === this.editingAnnouncement);
-        this.currentAnnouncement.updated = now;
-        this.announcements.splice(index, 1, this.currentAnnouncement);
-        this.$toast?.success("公告更新成功");
-      } else {
-        this.currentAnnouncement.id = Date.now();
-        this.currentAnnouncement.created = now;
-        this.currentAnnouncement.updated = now;
-        this.announcements.push(this.currentAnnouncement);
-        this.$toast?.success("公告发布成功");
-      }
-      this.announcementDialogOpen = false;
-    },
-    deleteAnnouncement(id) {
-      if (confirm("确定删除该公告吗？")) {
-        this.announcements = this.announcements.filter(a => a.id !== id);
-        this.$toast?.success("公告删除成功");
-      }
-    },
-    toggleAnnouncementStatus(item) {
-      item.published = !item.published;
-      item.updated = new Date().toISOString().split("T")[0];
-      this.$toast?.success(`公告已${item.published ? '发布' : '取消发布'}`);
     },
 
     /*
@@ -616,21 +562,30 @@ export default {
      * 1. 打开发布公告弹窗（清空表单数据）
      */
     openAnnouncementDialog() {
-      this.editingAnnouncement = null; // 标记为“发布”而非“编辑”
-      this.currentAnnouncement = { // 重置表单数据
+      this.editingAnnouncement = null;
+      this.currentAnnouncement = {
         title: "",
         content: "",
-        published: true // 默认勾选“立即发布”
+        notice_id: null
       };
-      this.announcementDialogOpen = true; // 显示弹窗
+      this.announcementDialogOpen = true;
+    },
+
+    /**
+     * 编辑公告
+     */
+    editAnnouncement(item) {
+      this.editingAnnouncement = item.notice_id;
+      this.currentAnnouncement = { ...item };
+      this.announcementDialogOpen = true;
     },
 
     /**
      * 2. 保存公告（发布/编辑）- 只保留对接后端的逻辑，删除旧的假数据逻辑
      */
     async saveAnnouncement() {
-      const { title, content, published } = this.currentAnnouncement;
-      // 表单校验：标题和内容不能为空
+      const { title, content, notice_id } = this.currentAnnouncement;
+      // 表单校验
       if (!title.trim() || !content.trim()) {
         this.$toast?.warning("公告标题和内容不能为空！");
         return;
@@ -638,32 +593,36 @@ export default {
 
       this.announcementLoading = true;
       try {
-        // 获取管理员ID（从登录信息取，无则默认1，测试用）
+        // 获取管理员ID
         const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
-        const adminId = userInfo.user_id || userInfo.id || 1; // 兜底避免报错
+        const adminId = userInfo.user_id || userInfo.id || 1;
 
-        // 构造FormData（后端要求的表单格式）
         const formData = new URLSearchParams();
-        formData.append('title', title); // 公告标题
-        formData.append('content', content); // 公告内容
-        formData.append('admin_id', adminId); // 管理员ID
-        formData.append('is_active', published ? 1 : 0); // 发布状态（1=发布，0=草稿）
+        formData.append('title', title);
+        formData.append('content', content);
+        formData.append('created_by', adminId);
 
-        // 对接后端发布接口：POST /api/notice/create_notice
+        let url = '/api/notice/create';
+        
+        // 如果是编辑操作
+        if (notice_id) {
+          formData.append('notice_id', notice_id);
+          // 这里假设存在更新接口，如果后端没有可以调整
+          url = '/api/notice/update';
+        }
+
         await axios.post(
-          '/api/notice/create_notice',
+          url,
           formData,
           { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
 
-        // 操作成功：关闭弹窗+刷新公告列表+提示
         this.announcementDialogOpen = false;
-        this.$toast?.success("公告发布成功！");
-        this.loadAllAnnouncements(); // 刷新列表显示新公告
+        this.$toast?.success(notice_id ? "公告更新成功！" : "公告创建成功！");
+        this.loadAllAnnouncements();
       } catch (error) {
-        console.error("发布公告失败：", error.response?.data || error.message);
-        // 提示具体错误（后端返回的错误信息）
-        this.$toast?.error("发布失败：" + (error.response?.data?.detail || "服务器错误，请检查后端配置"));
+        console.error("公告操作失败：", error.response?.data || error.message);
+        this.$toast?.error("操作失败：" + (error.response?.data?.detail || "服务器错误"));
       } finally {
         this.announcementLoading = false;
       }
@@ -675,21 +634,16 @@ export default {
     async loadAllAnnouncements() {
       this.announcementLoading = true;
       try {
-        // 对接后端真实接口路径 /api/notice/all_notice_info
-        const res = await axios.get('/api/notice/all_notice_info');
+        const res = await axios.get('/api/notice/list');
         
-        // 后端返回格式是 {success: true, data: {notice: [], count: ...}}
-        const noticeList = res.data?.data?.notice || [];
-        
-        // 映射后端字段到前端（后端是 notice_id、title、content、created_at）
-        this.announcements = noticeList.map(item => ({
-          notice_id: item.notice_id, // 后端公告ID
-          title: item.title, // 后端标题
-          content: item.content, // 后端内容
-          published: item.is_active === 1, // 后端 is_active（1=发布，0=未发布）
-          create_time: item.created_at ? new Date(item.created_at).toLocaleDateString() : '' // 后端创建时间
+        // 映射后端字段到前端
+        this.announcements = res.data?.data?.notices.map(item => ({
+          notice_id: item.notice_id,
+          title: item.title,
+          content: item.content,
+          created_at: item.created_at,
+          published: item.is_active === 1
         }));
-        console.log("成功加载公告：", this.announcements);
       } catch (error) {
         console.error("加载公告失败：", error.response?.data || error.message);
         this.announcements = [];
@@ -700,25 +654,30 @@ export default {
     },
 
     /**
-     * 3. 切换公告发布状态
+     * 4. 切换公告发布状态
      */
     async toggleAnnouncementStatus(item) {
       this.announcementLoading = true;
       try {
-        // 修复：对接后端更新公告接口 /api/notice/update_notice
+        const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const adminId = userInfo.user_id || userInfo.id || 1;
+        
+        const url = item.published ? '/api/notice/unpublish' : '/api/notice/publish';
         const formData = new URLSearchParams();
-        formData.append('notice_id', item.notice_id); // 后端必填：公告ID
-        formData.append('title', item.title); // 后端必填：标题（更新时需传原标题）
-        formData.append('content', item.content); // 后端必填：内容（更新时需传原内容）
-        formData.append('is_active', item.published ? 0 : 1); // 切换状态：1=发布，0=未发布
+        formData.append('notice_id', item.notice_id);
+        
+        // 发布时需要管理员ID
+        if (!item.published) {
+          formData.append('admin_id', adminId);
+        }
 
         await axios.post(
-          '/api/notice/update_notice',
+          url,
           formData,
           { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
 
-        // 本地刷新状态
+        // 更新本地状态
         this.announcements = this.announcements.map(notice => 
           notice.notice_id === item.notice_id 
             ? { ...notice, published: !item.published } 
@@ -734,27 +693,34 @@ export default {
     },
 
     /**
-     * 4. 删除公告
+     * 5. 删除公告
      */
     async deleteAnnouncement(noticeId) {
+      if (!noticeId || isNaN(Number(noticeId)) || Number(noticeId) <= 0) {
+        this.$toast?.error("公告ID无效，无法删除");
+        return;
+      }
       if (!confirm("确定删除该公告吗？删除后无法恢复！")) return;
 
       try {
-        // 对接后端删除接口 /api/notice/delete_notice
         const formData = new URLSearchParams();
-        formData.append('notice_id', noticeId); // 后端必填：公告ID
+        formData.append('notice_id', Number(noticeId));
 
         await axios.post(
-          '/api/notice/delete_notice',
+          '/api/notice/delete',
           formData,
           { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
 
-        this.announcements = this.announcements.filter(notice => notice.notice_id !== noticeId);
+        // 更新本地列表
+        this.announcements = this.announcements.filter(notice => 
+          Number(notice.notice_id) !== Number(noticeId)
+        );
         this.$toast?.success("公告删除成功");
       } catch (error) {
-        console.error("删除公告失败：", error.response?.data || error.message);
-        this.$toast?.error("删除失败：" + (error.response?.data?.detail || error.message));
+        console.error("删除失败详情：", error.response);
+        const errDetail = error.response?.data?.detail || "未知错误";
+        this.$toast?.error("删除失败：" + errDetail);
       }
     }
   }
