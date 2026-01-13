@@ -73,7 +73,10 @@
               <v-card-text>
                 <div class="stat-value">{{ stat.value }}</div>
                 <div class="stat-change" :class="stat.change > 0 ? 'positive' : 'negative'">
-                  {{ stat.change > 0 ? '+' : '' }}{{ stat.change }}%
+                  <!-- 这里的change逻辑如果是假数据可以先隐藏或保留 -->
+                  <span v-if="stat.change !== 0">
+                     {{ stat.change > 0 ? '+' : '' }}{{ stat.change }}%
+                  </span>
                 </div>
               </v-card-text>
             </v-card>
@@ -92,12 +95,7 @@
                 prepend-icon="mdi-magnify"
                 style="width: 300px;"
               />
-              <v-btn
-                style="background-color: #742DD8; color: white;"
-                @click="openUserDialog"
-              >
-                <v-icon left>mdi-plus</v-icon>添加用户
-              </v-btn>
+              <!-- 【已删除】这里删除了添加用户按钮 -->
             </div>
 
             <!-- 用户表格 -->
@@ -106,18 +104,22 @@
               :search="searchQuery"
               :headers="userHeaders"
               class="user-table"
-              item-key="id"
+              item-key="user_id" 
               :items-per-page-options="[10, 20, 50]"
+              :loading="userLoading"
             >
               <template v-slot:item.status="{ item }">
+                <!-- 状态开关：对接 update_user_status -->
                 <v-switch
-                  v-model="item.status"
-                  :label="item.status ? '启用' : '禁用'"
+                  v-model="item.statusBoolean"
+                  :label="item.statusBoolean ? '启用' : '禁用'"
                   color="#742DD8"
                   @change="updateUserStatus(item)"
+                  inset
                 />
               </template>
               <template v-slot:item.actions="{ item }">
+                <!-- 编辑按钮（保留功能，暂不对接复杂编辑） -->
                 <v-btn
                   icon
                   small
@@ -126,10 +128,11 @@
                 >
                   <v-icon>mdi-pencil</v-icon>
                 </v-btn>
+                <!-- 删除按钮 -->
                 <v-btn
                   icon
                   small
-                  @click="deleteUser(item.id)"
+                  @click="deleteUser(item.user_id)"
                   style="color: #e53935;"
                 >
                   <v-icon>mdi-delete-outline</v-icon>
@@ -235,7 +238,6 @@
               <v-card-title>{{ editingAnnouncement ? '编辑公告' : '创建公告' }}</v-card-title>
               <v-card-text>
                 <v-form>
-                  <!-- 标题输入框 -->
                   <v-text-field
                     v-model="currentAnnouncement.title"
                     label="公告标题"
@@ -243,7 +245,6 @@
                     full-width
                     placeholder="请输入公告标题"
                   />
-                  <!-- 内容输入框 -->
                   <v-textarea
                     v-model="currentAnnouncement.content"
                     label="公告内容"
@@ -272,31 +273,26 @@
       </v-container>
     </div>
 
-    <!-- 用户编辑对话框 -->
+    <!-- 用户编辑对话框 (虽然删除了添加按钮，但保留编辑功能) -->
     <v-dialog v-model="userDialogOpen" max-width="500px">
       <v-card>
-        <v-card-title>{{ editingUser ? '编辑用户' : '添加用户' }}</v-card-title>
+        <v-card-title>编辑用户</v-card-title>
         <v-card-text>
           <v-form>
             <v-text-field
               v-model="currentUser.username"
               label="用户名"
-              required
+              disabled
             />
             <v-text-field
               v-model="currentUser.email"
               label="邮箱"
               type="email"
-              required
+              disabled
             />
-            <v-select
-              v-model="currentUser.role"
-              label="角色"
-              :items="['admin', 'user', 'moderator']"
-              required
-            />
+            <!-- 如果有更新用户信息的接口再启用这些编辑 -->
             <v-switch
-              v-model="currentUser.status"
+              v-model="currentUser.statusBoolean"
               label="启用账号"
               color="#742DD8"
             />
@@ -308,7 +304,7 @@
             style="background-color: #742DD8; color: white;"
             @click="saveUser"
           >
-            保存
+            保存状态
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -332,34 +328,31 @@ export default {
       announcementDialogOpen: false,
       editingUser: null,
       editingAnnouncement: null,
-      announcementLoading: false, // 新增：公告加载/操作状态
+      announcementLoading: false,
 
-      // 内容审核相关状态（核心）
-      loading: false,          // 加载状态
-      auditingIds: [],         // 正在审核的行程ID（防重复点击）
-      contents: [],            // 待审核行程数组（从API获取）
+      // 加载状态
+      loading: false,          
+      userLoading: false,      // 用户列表加载状态
+      
+      auditingIds: [],         
+      contents: [],            
 
-      // 侧边栏配置
       sidebarItems: [
         { title: "用户管理", icon: "mdi-account" },
         { title: "内容审核", icon: "mdi-file-check" },
         { title: "公告管理", icon: "mdi-bullhorn" }
       ],
 
-      // 统计数据（原有假数据，可后续对接API）
+      // 统计数据
       stats: [
-        { title: "总用户数", value: 1280, change: 12 },
-        { title: "今日新增", value: 24, change: 8 },
-        { title: "内容总数", value: 3560, change: 5 },
-        { title: "待审核内容", value: 12, change: -3 }
+        { title: "总用户数", value: 0, change: 0 },
+        { title: "今日新增内容", value: 0, change: 0 },
+        { title: "内容总数", value: 0, change: 0 },
+        { title: "待审核内容", value: 0, change: 0 } // 这个将动态加载
       ],
 
-      // 用户数据（原有假数据，可后续对接API）
-      users: [
-        { id: 1, username: "john_doe", email: "john@example.com", role: "admin", status: true, registered: "2024-01-15" },
-        { id: 2, username: "jane_smith", email: "jane@example.com", role: "user", status: true, registered: "2024-02-20" },
-        { id: 3, username: "mike_brown", email: "mike@example.com", role: "moderator", status: false, registered: "2024-03-05" }
-      ],
+      // 用户数据
+      users: [], 
 
       // 公告数据
       announcements: [],
@@ -370,13 +363,13 @@ export default {
       },
 
       // 表格头部配置（适配后端字段）
+      // ✅ 修正：字段改为 user_id
       userHeaders: [
-        { text: "ID", value: "id", sortable: true, align: "start" },
+        { text: "ID", value: "user_id", sortable: true, align: "start" },
         { text: "用户名", value: "username", sortable: true, align: "start" },
         { text: "邮箱", value: "email", sortable: true, align: "start" },
-        { text: "角色", value: "role", sortable: true, align: "center" },
+        { text: "角色", value: "role", sortable: true, align: "center" }, // 假设后端有role字段，没有则显示空
         { text: "状态", value: "status", sortable: true, align: "center" },
-        { text: "注册日期", value: "registered", sortable: true, align: "center" },
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       contentHeaders: [
@@ -396,19 +389,17 @@ export default {
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
 
-      // 编辑对象
       currentUser: {
         username: "",
         email: "",
         role: "user",
-        status: true
+        statusBoolean: true
       },
     };
   },
   created() {
-    // 页面初始化时加载待审核行程
-    this.loadPendingTrips();
-    this.loadAllAnnouncements();
+    // 页面初始化时加载所有数据
+    this.refreshData();
   },
   methods: {
     // ========== 基础功能 ==========
@@ -417,125 +408,199 @@ export default {
       this.$router.push('/login');
     },
     refreshData() {
+      this.loadDashboardStats(); // 加载统计
+      this.loadAllUsers();       // 加载用户
+      this.loadPendingTrips();   // 加载审核
+      this.loadAllAnnouncements(); // 加载公告
       this.$toast?.success("数据已刷新");
-      // 刷新待审核行程
-      this.loadPendingTrips();
     },
     showNotifications() {
       this.unreadNotifications = 0;
     },
 
-    // ========== 用户管理功能 ==========
+    // ========== 1. 统计面板对接 ==========
+// ========== 1. 统计面板对接 (修改后) ==========
+   // ========== 1. 统计面板对接 (针对你的后端结构优化) ==========
+    async loadDashboardStats() {
+      try {
+        // 并行请求
+        const [resUser, resContent, resPending] = await Promise.allSettled([
+          axios.get('/api/admin/user_count'),
+          axios.get('/api/admin/content_count'),
+          axios.get('/api/admin/pending_review_count')
+        ]);
+
+        // 辅助函数：专门处理你的后端返回格式 { success: true, data: { xxx_count: 123 } }
+        const getCount = (res, keyName) => {
+          if (res.status === 'rejected' || !res.value) return 0;
+          const body = res.value.data; 
+          // 尝试从 data.data[keyName] 获取
+          if (body?.data && body.data[keyName] !== undefined) {
+            return body.data[keyName];
+          }
+          return 0;
+        };
+
+        // 1. 总用户数 (对应后端 key: user_count)
+        this.stats[0].value = getCount(resUser, 'user_count');
+
+        // 2. ✅ 今日新增内容 (从 content_count 接口的新字段获取)
+        if (resContent.status === 'fulfilled' && resContent.value.data?.data) {
+           this.stats[1].value = resContent.value.data.data.today_new_count || 0;
+        }
+
+        // 3. 内容总数 (对应后端 key: content_count)
+        this.stats[2].value = getCount(resContent, 'content_count');
+
+        // 4. 待审核内容 (对应后端 key: pending_review_count)
+        this.stats[3].value = getCount(resPending, 'pending_review_count');
+
+      } catch (error) {
+        console.error("加载统计数据失败", error);
+      }
+    },
+
+    // ========== 2. 用户管理功能对接 ==========
+    
+    // 加载所有用户列表 /api/admin/all_user_info
+    async loadAllUsers() {
+      this.userLoading = true;
+      try {
+        const res = await axios.get('/api/admin/all_user_info');
+        // 假设后端返回 { users: [...] } 或 { data: { users: [...] } }
+        const users = res.data?.users || res.data?.data?.users || [];
+        
+        // 数据处理：将后端 status 字符串转换为 switch 需要的 boolean
+        this.users = users.map(u => ({
+          ...u,
+          // 如果后端 status 是 'active'/'banned'，转为 true/false
+          statusBoolean: u.status === 'active' || u.status === '1' || u.status === 1,
+          role: u.admin_id ? 'admin' : 'user' // 简单推断角色
+        }));
+        
+      } catch (error) {
+        console.error("加载用户列表失败", error);
+        this.$toast?.error("加载用户列表失败");
+      } finally {
+        this.userLoading = false;
+        this.loadDashboardStats(); 
+      }
+    },
+
+    // 更新用户状态（启用/禁用） /api/admin/update_user_status
+    async updateUserStatus(item) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append('user_id', item.user_id);
+        // 转换回后端需要的格式 'active' / 'banned'
+        formData.append('status', item.statusBoolean ? 'active' : 'banned');
+
+        await axios.post('/api/admin/update_user_status', formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        
+        this.$toast?.success(`用户 ${item.username} 状态已更新为 ${item.statusBoolean ? '启用' : '禁用'}`);
+      } catch (error) {
+        console.error("更新状态失败", error);
+        // 失败回滚开关状态
+        item.statusBoolean = !item.statusBoolean;
+        this.$toast?.error("状态更新失败");
+      }
+    },
+
+    // 删除用户 /api/admin/delete_user
+    async deleteUser(userId) {
+      if (!confirm("确定删除该用户吗？此操作不可恢复！")) return;
+
+      try {
+        const formData = new URLSearchParams();
+        formData.append('user_id', userId);
+
+        await axios.post('/api/admin/delete_user', formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        // 前端移除
+        this.users = this.users.filter(u => u.user_id !== userId);
+        this.$toast?.success("用户删除成功");
+      } catch (error) {
+        console.error("删除用户失败", error);
+        this.$toast?.error("删除失败: " + (error.response?.data?.detail || "未知错误"));
+      }
+    },
+
+    // 简单的编辑弹窗逻辑（仅修改状态，因为没其他API）
     openUserDialog() {
-      this.editingUser = null;
-      this.currentUser = { username: "", email: "", role: "user", status: true };
-      this.userDialogOpen = true;
+       // 已删除添加功能
     },
     editUser(item) {
-      this.editingUser = item.id;
+      this.editingUser = item.user_id;
       this.currentUser = { ...item };
       this.userDialogOpen = true;
     },
-    saveUser() {
-      if (this.editingUser) {
-        const index = this.users.findIndex(u => u.id === this.editingUser);
-        this.users.splice(index, 1, this.currentUser);
-      } else {
-        this.currentUser.id = Date.now();
-        this.currentUser.registered = new Date().toISOString().split("T")[0];
-        this.users.push(this.currentUser);
-      }
+    async saveUser() {
+      // 复用 updateUserStatus 逻辑
+      await this.updateUserStatus({
+        user_id: this.editingUser,
+        username: this.currentUser.username,
+        statusBoolean: this.currentUser.statusBoolean
+      });
       this.userDialogOpen = false;
-      this.$toast?.success("用户保存成功");
-    },
-    deleteUser(id) {
-      if (confirm("确定删除该用户吗？")) {
-        this.users = this.users.filter(u => u.id !== id);
-        this.$toast?.success("用户删除成功");
-      }
-    },
-    updateUserStatus(item) {
-      this.$toast?.success(`用户 ${item.username} 状态已更新`);
+      this.loadAllUsers(); // 刷新列表
     },
 
-    /*
-      加载待审核行程（对接后端 /api/admin/all_pending_trips）
-     */
+
+    // ========== 3. 内容审核功能 ==========
     async loadPendingTrips() {
       this.loading = true;
       try {
         const res = await axios.get('/api/admin/all_pending_trips');
-        // 后端返回结构：{success: true, data: {trips: [], count: ...}}
-        const backendTripList = res.data?.data?.trips || [];
-        // 确保是数组（避免后端返回非数组类型）
-        const validTrips = Array.isArray(backendTripList) ? backendTripList : [];
+        const validTrips = res.data?.data?.trips || res.data?.trips || [];
 
-        // 映射后端字段到前端表格
         this.contents = validTrips.map(item => ({
-          trip_id: item.trip_id, // 后端行程ID
+          trip_id: item.trip_id,
           title: item.title || '未命名行程',
-          username: item.owner_username || '未知用户', // 后端关联的用户名
+          username: item.owner_username || '未知用户',
           destination: item.destination || '未知目的地',
-          publish_status: item.publish_status || 'pending', // 审核状态
-          create_time: item.created_at 
-            ? new Date(item.created_at).toLocaleDateString() 
-            : new Date().toLocaleDateString() // 提交时间
+          publish_status: item.publish_status || 'pending',
+          create_time: item.created_at || '未知时间' 
         }));
-        console.log("成功加载待审核行程:", this.contents);
       } catch (error) {
         console.error("加载待审核行程失败:", error);
-        this.contents = [];
-        this.$toast?.error("加载待审核行程失败，请重试");
       } finally {
         this.loading = false;
       }
     },
 
-    /**
-     * 处理行程审核（对接审核+发消息API）
-     * @param {number} tripId - 行程ID
-     * @param {string} action - accept/reject
-     */
     async handleReview(tripId, action) {
       if (this.auditingIds.includes(tripId)) return;
       this.auditingIds.push(tripId);
 
       try {
-        // 获取管理员ID（从登录信息中读取）
         const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
         const senderId = userInfo.user_id || userInfo.id || 1;
 
-        // 1. 调用审核API（/api/admin/pending）
         const reviewParams = new URLSearchParams();
         reviewParams.append('trip_id', tripId);
         reviewParams.append('status', action);
-        await axios.post('/api/admin/pending', reviewParams, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
+        await axios.post('/api/admin/pending', reviewParams);
 
-        // 2. 调用发消息API（/api/admin/send_message）
         const msgParams = new URLSearchParams();
         msgParams.append('sender_id', senderId);
         msgParams.append('trip_id', tripId);
         msgParams.append('status', action);
-        await axios.post('/api/admin/send_message', msgParams, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
+        await axios.post('/api/admin/send_message', msgParams);
 
-        // 操作成功提示+刷新数据
-        this.$toast?.success(`行程${tripId}已${action === 'accept' ? '审核通过' : '审核拒绝'}，已通知用户`);
+        this.$toast?.success(`操作成功`);
         this.loadPendingTrips();
+        this.loadDashboardStats(); // 审核完刷新计数
       } catch (error) {
-        console.error(`审核行程${tripId}失败:`, error);
-        this.$toast?.error(`行程${tripId}审核失败，请重试`);
+        this.$toast?.error(`操作失败`);
       } finally {
         this.auditingIds = this.auditingIds.filter(id => id !== tripId);
       }
     },
 
-    /**
-     * 审核状态文本映射
-     */
     getStatusText(status) {
       switch (status) {
         case 'pending': return '待审核';
@@ -544,10 +609,6 @@ export default {
         default: return '未知状态';
       }
     },
-
-    /**
-     * 审核状态颜色映射
-     */
     getStatusColor(status) {
       switch (status) {
         case 'pending': return 'orange';
@@ -557,43 +618,23 @@ export default {
       }
     },
 
-    // ==========公告管理核心方法 ==========
-    /**
-     * 1. 打开发布公告弹窗（清空表单数据）
-     */
+    // ========== 4. 公告管理功能 ==========
     openAnnouncementDialog() {
       this.editingAnnouncement = null;
-      this.currentAnnouncement = {
-        title: "",
-        content: "",
-        notice_id: null
-      };
+      this.currentAnnouncement = { title: "", content: "", notice_id: null };
       this.announcementDialogOpen = true;
     },
-
-    /**
-     * 编辑公告
-     */
     editAnnouncement(item) {
       this.editingAnnouncement = item.notice_id;
       this.currentAnnouncement = { ...item };
       this.announcementDialogOpen = true;
     },
-
-    /**
-     * 2. 保存公告（发布/编辑）- 只保留对接后端的逻辑，删除旧的假数据逻辑
-     */
     async saveAnnouncement() {
       const { title, content, notice_id } = this.currentAnnouncement;
-      // 表单校验
-      if (!title.trim() || !content.trim()) {
-        this.$toast?.warning("公告标题和内容不能为空！");
-        return;
-      }
+      if (!title.trim() || !content.trim()) return;
 
       this.announcementLoading = true;
       try {
-        // 获取管理员ID
         const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
         const adminId = userInfo.user_id || userInfo.id || 1;
 
@@ -603,40 +644,25 @@ export default {
         formData.append('created_by', adminId);
 
         let url = '/api/notice/create';
-        
-        // 如果是编辑操作
         if (notice_id) {
           formData.append('notice_id', notice_id);
-          // 这里假设存在更新接口，如果后端没有可以调整
-          url = '/api/notice/update';
+          // 假设有 update 接口
+          url = '/api/notice/update'; 
         }
 
-        await axios.post(
-          url,
-          formData,
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
+        await axios.post(url, formData);
         this.announcementDialogOpen = false;
-        this.$toast?.success(notice_id ? "公告更新成功！" : "公告创建成功！");
         this.loadAllAnnouncements();
       } catch (error) {
-        console.error("公告操作失败：", error.response?.data || error.message);
-        this.$toast?.error("操作失败：" + (error.response?.data?.detail || "服务器错误"));
+        this.$toast?.error("操作失败");
       } finally {
         this.announcementLoading = false;
       }
     },
-
-    /**
-     * 3. 加载所有公告
-     */
     async loadAllAnnouncements() {
       this.announcementLoading = true;
       try {
         const res = await axios.get('/api/notice/list');
-        
-        // 映射后端字段到前端
         this.announcements = res.data?.data?.notices.map(item => ({
           notice_id: item.notice_id,
           title: item.title,
@@ -645,17 +671,11 @@ export default {
           published: item.is_active === 1
         }));
       } catch (error) {
-        console.error("加载公告失败：", error.response?.data || error.message);
         this.announcements = [];
-        this.$toast?.error("加载公告失败：" + (error.response?.data?.detail || "接口调用错误"));
       } finally {
         this.announcementLoading = false;
       }
     },
-
-    /**
-     * 4. 切换公告发布状态
-     */
     async toggleAnnouncementStatus(item) {
       this.announcementLoading = true;
       try {
@@ -665,62 +685,27 @@ export default {
         const url = item.published ? '/api/notice/unpublish' : '/api/notice/publish';
         const formData = new URLSearchParams();
         formData.append('notice_id', item.notice_id);
+        if (!item.published) formData.append('admin_id', adminId);
+
+        await axios.post(url, formData);
         
-        // 发布时需要管理员ID
-        if (!item.published) {
-          formData.append('admin_id', adminId);
-        }
-
-        await axios.post(
-          url,
-          formData,
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        // 更新本地状态
-        this.announcements = this.announcements.map(notice => 
-          notice.notice_id === item.notice_id 
-            ? { ...notice, published: !item.published } 
-            : notice
-        );
-        this.$toast?.success(`公告已${!item.published ? '发布' : '取消发布'}`);
+        // 更新本地
+        item.published = !item.published;
       } catch (error) {
-        console.error("切换公告状态失败：", error.response?.data || error.message);
-        this.$toast?.error("切换状态失败：" + (error.response?.data?.detail || error.message));
+        this.$toast?.error("切换状态失败");
       } finally {
         this.announcementLoading = false;
       }
     },
-
-    /**
-     * 5. 删除公告
-     */
     async deleteAnnouncement(noticeId) {
-      if (!noticeId || isNaN(Number(noticeId)) || Number(noticeId) <= 0) {
-        this.$toast?.error("公告ID无效，无法删除");
-        return;
-      }
-      if (!confirm("确定删除该公告吗？删除后无法恢复！")) return;
-
+      if (!confirm("确定删除？")) return;
       try {
         const formData = new URLSearchParams();
-        formData.append('notice_id', Number(noticeId));
-
-        await axios.post(
-          '/api/notice/delete',
-          formData,
-          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-        );
-
-        // 更新本地列表
-        this.announcements = this.announcements.filter(notice => 
-          Number(notice.notice_id) !== Number(noticeId)
-        );
-        this.$toast?.success("公告删除成功");
+        formData.append('notice_id', noticeId);
+        await axios.post('/api/notice/delete', formData);
+        this.loadAllAnnouncements();
       } catch (error) {
-        console.error("删除失败详情：", error.response);
-        const errDetail = error.response?.data?.detail || "未知错误";
-        this.$toast?.error("删除失败：" + errDetail);
+        this.$toast?.error("删除失败");
       }
     }
   }
@@ -733,29 +718,8 @@ export default {
   visibility: visible !important;
 }
 :deep(.v-data-table th.v-data-table-header__cell) {
-  display: table-cell !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  padding: 0 16px !important;
   color: #675096 !important;
   font-weight: 600 !important;
-  border-bottom: 2px solid #DBD1EF !important;
-}
-:deep(.v-data-table td.v-data-table__cell) {
-  vertical-align: middle !important;
-  padding: 12px 16px !important;
-}
-:deep(.announcement-table .v-data-table__cell:last-child) {
-  min-width: 200px !important;
-}
-
-/* 原有样式完全保留 */
-.action-group {
-  display: flex;
-  gap: 12px;
-}
-.action-btn {
-  margin-left: 12px;
 }
 .admin-container {
   min-height: 100vh;
@@ -769,31 +733,15 @@ export default {
   margin-left: 250px;
   margin-top: 64px;
   width: calc(100% - 250px);
-  box-sizing: border-box;
 }
 .v-navigation-drawer {
   width: 250px !important;
-  flex-shrink: 0;
   height: calc(100vh - 64px) !important;
-}
-.admin-content {
-  padding: 24px 32px;
-  flex: 1;
-  max-width: calc(100% - 250px);
-  width: 100%;
-  box-sizing: border-box;
-}
-.stats-row {
-  margin-bottom: 24px;
 }
 .stat-card {
   border-color: #DBD1EF;
   background-color: white;
   height: 100%;
-  transition: transform 0.2s;
-}
-.stat-card:hover {
-  transform: translateY(-5px);
 }
 .stat-value {
   font-size: 24px;
@@ -804,52 +752,15 @@ export default {
   font-size: 14px;
   margin-top: 4px;
 }
-.positive {
-  color: #43a047;
-}
-.negative {
-  color: #e53935;
-}
-.admin-card {
-  border-color: #DBD1EF;
-  background-color: white;
-}
+.positive { color: #43a047; }
+.negative { color: #e53935; }
 .user-controls {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.notification-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background-color: #e53935;
-  color: white;
-  border-radius: 50%;
-  width: 16px;
-  height: 16px;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .selected-item {
   background-color: rgba(116, 45, 216, 0.1);
   border-right: 4px solid #742DD8;
-}
-@media (max-width: 600px) {
-  .admin-content {
-    padding: 16px;
-  }
-  .user-controls {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .v-text-field {
-    width: 100% !important;
-  }
 }
 </style>
