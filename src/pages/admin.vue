@@ -1,6 +1,6 @@
 <template>
   <div class="admin-container">
-    <!-- 顶部导航栏（移除侧边栏切换按钮） -->
+    <!-- 顶部导航栏 -->
     <v-app-bar
       elevation="0"
       style="background-color: #F3F2FD; border-bottom: 1px solid #DBD1EF; z-index: 10"
@@ -38,7 +38,7 @@
 
     <!-- 布局：左侧固定导航栏 + 右侧主内容 -->
     <div class="admin-layout">
-      <!-- 左侧导航栏（固定不可收起） -->
+      <!-- 左侧导航栏 -->
       <v-navigation-drawer
         :width="250"
         style="background-color: #F3F2FD; border-right: 1px solid #DBD1EF"
@@ -61,7 +61,7 @@
         </v-list>
       </v-navigation-drawer>
 
-      <!-- 主体内容区（避开导航栏遮挡） -->
+      <!-- 主体内容区 -->
       <v-container fluid class="admin-content">
         <!-- 统计卡片 -->
         <v-row class="stats-row" style="margin-top: 24px;">
@@ -138,37 +138,45 @@
             </v-data-table>
           </v-card-text>
 
-          <!-- 内容审核面板 -->
+          <!-- 内容审核面板（仅修改此部分） -->
           <v-card-text v-if="activeSidebarItem === 1">
             <v-data-table
               :items="contents"
               :headers="contentHeaders"
               class="content-table"
-              item-key="id"
+              item-key="trip_id"
               :items-per-page-options="[10, 20, 50]"
+              :loading="loading"
             >
               <template v-slot:item.status="{ item }">
-                <v-chip :color="item.status === 'pending' ? 'orange' : item.status === 'approved' ? 'green' : 'red'">
-                  {{ item.status === 'pending' ? '待审核' : item.status === 'approved' ? '已通过' : '已拒绝' }}
+                <v-chip :color="getStatusColor(item.publish_status)">
+                  {{ getStatusText(item.publish_status) }}
                 </v-chip>
               </template>
               <template v-slot:item.actions="{ item }">
                 <v-btn
                   small
-                  @click="approveContent(item.id)"
+                  @click="handleReview(item.trip_id, 'accept')"
                   style="background-color: #43a047; color: white; margin-right: 4px;"
-                  v-if="item.status === 'pending'"
+                  v-if="item.publish_status === 'pending'"
+                  :disabled="auditingIds.includes(item.trip_id)"
                 >
+                  <v-icon v-if="auditingIds.includes(item.trip_id)" small>mdi-loading</v-icon>
                   通过
                 </v-btn>
                 <v-btn
                   small
-                  @click="rejectContent(item.id)"
+                  @click="handleReview(item.trip_id, 'reject')"
                   style="background-color: #e53935; color: white;"
-                  v-if="item.status === 'pending'"
+                  v-if="item.publish_status === 'pending'"
+                  :disabled="auditingIds.includes(item.trip_id)"
                 >
+                  <v-icon v-if="auditingIds.includes(item.trip_id)" small>mdi-loading</v-icon>
                   拒绝
                 </v-btn>
+              </template>
+              <template v-slot:no-data>
+                <v-alert type="info" border="start" color="#675096">暂无待审核的行程数据</v-alert>
               </template>
             </v-data-table>
           </v-card-text>
@@ -205,29 +213,27 @@
                   {{ item.published ? '已发布' : '草稿' }}
                 </v-chip>
               </template>
-            <template v-slot:item.actions="{ item }">
-              <div style="display:flex; gap:12px; align-items:center;">
-                <v-btn icon small @click="editAnnouncement(item)" style="color: #675096;">
-                  <v-icon>mdi-pencil</v-icon>
-                </v-btn>
-
-                <v-btn icon small @click="deleteAnnouncement(item.id)" style="color: #e53935;">
-                  <v-icon>mdi-delete-outline</v-icon>
-                </v-btn>
-
-                <v-btn
-              small
-              @click="toggleAnnouncementStatus(item)"
-              :style="{
-                backgroundColor: item.published ? '#f57c00' : '#43a047',
-                color: 'white',
-                marginLeft: '24px'  // 注意这里是驼峰式命名（marginLeft）
-              }"
-            >
-              {{ item.published ? '取消发布' : '发布' }}
-            </v-btn>
-  </div>
-</template>
+              <template v-slot:item.actions="{ item }">
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <v-btn icon small @click="editAnnouncement(item)" style="color: #675096;">
+                    <v-icon>mdi-pencil</v-icon>
+                  </v-btn>
+                  <v-btn icon small @click="deleteAnnouncement(item.id)" style="color: #e53935;">
+                    <v-icon>mdi-delete-outline</v-icon>
+                  </v-btn>
+                  <v-btn
+                    small
+                    @click="toggleAnnouncementStatus(item)"
+                    :style="{
+                      backgroundColor: item.published ? '#f57c00' : '#43a047',
+                      color: 'white',
+                      marginLeft: '24px'
+                    }"
+                  >
+                    {{ item.published ? '取消发布' : '发布' }}
+                  </v-btn>
+                </div>
+              </template>
             </v-data-table>
           </v-card-text>
         </v-card>
@@ -282,20 +288,25 @@
         <v-card-title>{{ editingAnnouncement ? '编辑公告' : '发布公告' }}</v-card-title>
         <v-card-text>
           <v-form>
+            <!-- 标题输入框：绑定currentAnnouncement.title，必填 -->
             <v-text-field
               v-model="currentAnnouncement.title"
               label="公告标题"
               required
               full-width
+              placeholder="请输入公告标题"
             />
+            <!-- 内容输入框：绑定currentAnnouncement.content，必填 -->
             <v-textarea
               v-model="currentAnnouncement.content"
               label="公告内容"
               required
               rows="8"
               full-width
+              placeholder="请输入公告详细内容"
               style="margin-top: 16px;"
             />
+            <!-- 立即发布开关：绑定currentAnnouncement.published -->
             <v-switch
               v-model="currentAnnouncement.published"
               label="立即发布"
@@ -309,7 +320,9 @@
           <v-btn
             style="background-color: #742DD8; color: white;"
             @click="saveAnnouncement"
+            :disabled="announcementLoading"
           >
+            <v-icon v-if="announcementLoading" small>mdi-loading</v-icon>
             保存
           </v-btn>
         </v-card-actions>
@@ -319,11 +332,13 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: "AdminPanel",
   data() {
     return {
-      // 状态管理（移除sidebarOpen）
+      // 基础状态
       activeSidebarItem: 0,
       searchQuery: "",
       announcementSearch: "",
@@ -332,15 +347,21 @@ export default {
       announcementDialogOpen: false,
       editingUser: null,
       editingAnnouncement: null,
+      announcementLoading: false, // 新增：公告加载/操作状态
 
-      // 侧边栏项目
+      // 内容审核相关状态（核心）
+      loading: false,          // 加载状态
+      auditingIds: [],         // 正在审核的行程ID（防重复点击）
+      contents: [],            // 待审核行程数组（从API获取）
+
+      // 侧边栏配置
       sidebarItems: [
         { title: "用户管理", icon: "mdi-account" },
         { title: "内容审核", icon: "mdi-file-check" },
         { title: "公告管理", icon: "mdi-bullhorn" }
       ],
 
-      // 统计数据
+      // 统计数据（原有假数据，可后续对接API）
       stats: [
         { title: "总用户数", value: 1280, change: 12 },
         { title: "今日新增", value: 24, change: 8 },
@@ -348,24 +369,22 @@ export default {
         { title: "待审核内容", value: 12, change: -3 }
       ],
 
-      // 用户/内容/公告数据（保持不变）
+      // 用户数据（原有假数据，可后续对接API）
       users: [
         { id: 1, username: "john_doe", email: "john@example.com", role: "admin", status: true, registered: "2024-01-15" },
         { id: 2, username: "jane_smith", email: "jane@example.com", role: "user", status: true, registered: "2024-02-20" },
         { id: 3, username: "mike_brown", email: "mike@example.com", role: "moderator", status: false, registered: "2024-03-05" }
       ],
-      contents: [
-        { id: 1, title: "三亚旅行攻略", author: "jane_smith", type: "article", status: "pending", created: "2024-05-10" },
-        { id: 2, title: "北京美食推荐", author: "mike_brown", type: "article", status: "approved", created: "2024-05-09" },
-        { id: 3, title: "上海行程规划", author: "john_doe", type: "plan", status: "rejected", created: "2024-05-08" }
-      ],
-      announcements: [
-        { id: 1, title: "系统维护通知", content: "本系统将于5月20日进行维护，届时可能无法正常访问，敬请谅解。", published: true, created: "2024-05-15", updated: "2024-05-15" },
-        { id: 2, title: "新功能上线公告", content: "我们新增了用户积分系统，欢迎大家体验！", published: true, created: "2024-05-10", updated: "2024-05-10" },
-        { id: 3, title: "端午节活动策划", content: "端午节将举办线上答题活动，奖品丰富，敬请期待...", published: false, created: "2024-05-05", updated: "2024-05-06" }
-      ],
 
-      // 表格头部（保持不变）
+      // 公告数据
+      announcements: [],
+      currentAnnouncement: {
+        title: "",
+        content: "",
+        published: false // 对应后端 is_active（true=1，false=0）
+      },
+
+      // 表格头部配置（适配后端字段）
       userHeaders: [
         { text: "ID", value: "id", sortable: true, align: "start" },
         { text: "用户名", value: "username", sortable: true, align: "start" },
@@ -376,72 +395,60 @@ export default {
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       contentHeaders: [
-        { text: "ID", value: "id", sortable: true, align: "start" },
-        { text: "标题", value: "title", sortable: true, align: "start" },
-        { text: "作者", value: "author", sortable: true, align: "center" },
-        { text: "类型", value: "type", sortable: true, align: "center" },
-        { text: "状态", value: "status", sortable: true, align: "center" },
-        { text: "创建日期", value: "created", sortable: true, align: "center" },
+        { text: "行程ID", value: "trip_id", sortable: true, align: "start" },
+        { text: "行程标题", value: "title", sortable: true, align: "start" },
+        { text: "发布用户", value: "username", sortable: true, align: "center" },
+        { text: "目的地", value: "destination", sortable: true, align: "center" },
+        { text: "审核状态", value: "publish_status", sortable: true, align: "center" },
+        { text: "提交时间", value: "create_time", sortable: true, align: "center" },
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
       announcementHeaders: [
-        { text: "ID", value: "id", sortable: true, align: "start" },
-        { text: "标题", value: "title", sortable: true, align: "start" },
-        { text: "状态", value: "published", sortable: true, align: "center" },
-        { text: "创建日期", value: "created", sortable: true, align: "center" },
-        { text: "更新日期", value: "updated", sortable: true, align: "center" },
+        { text: "公告ID", value: "notice_id", sortable: true, align: "start" },
+        { text: "公告标题", value: "title", sortable: true, align: "start" },
+        { text: "发布状态", value: "published", sortable: true, align: "center" },
+        { text: "发布时间", value: "create_time", sortable: true, align: "center" },
         { text: "操作", value: "actions", sortable: false, align: "center" }
       ],
 
-      // 当前编辑对象（保持不变）
+      // 编辑对象
       currentUser: {
         username: "",
         email: "",
         role: "user",
         status: true
       },
-      currentAnnouncement: {
-        title: "",
-        content: "",
-        published: false
-      },
-
-      // 系统设置（保持不变）
-      settings: {
-        enableRegistration: true,
-        enableGuestAccess: false,
-        sessionTimeout: 30,
-        maxFileSize: 20
-      }
     };
   },
+  created() {
+    // 页面初始化时加载待审核行程
+    this.loadPendingTrips();
+    this.loadAllAnnouncements();
+  },
   methods: {
-    // 移除toggleSidebar方法（无需收起侧边栏）
-
-    // 登出功能（保持不变）
+    // ========== 基础功能 ==========
     logout() {
-      // 删除登录信息
-      sessionStorage.removeItem('user')
-
-      // 跳转到登录页面
-      this.$router.push('/login')
+      sessionStorage.removeItem('user');
+      this.$router.push('/login');
     },
-
-    // 其他方法（刷新、用户/内容/公告管理等保持不变）
     refreshData() {
-      this.$toast.success("数据已刷新");
+      this.$toast?.success("数据已刷新");
+      // 刷新待审核行程
+      this.loadPendingTrips();
     },
     showNotifications() {
       this.unreadNotifications = 0;
     },
+
+    // ========== 用户管理功能 ==========
     openUserDialog() {
       this.editingUser = null;
       this.currentUser = { username: "", email: "", role: "user", status: true };
       this.userDialogOpen = true;
     },
-    editUser(user) {
-      this.editingUser = user.id;
-      this.currentUser = { ...user };
+    editUser(item) {
+      this.editingUser = item.id;
+      this.currentUser = { ...item };
       this.userDialogOpen = true;
     },
     saveUser() {
@@ -454,136 +461,362 @@ export default {
         this.users.push(this.currentUser);
       }
       this.userDialogOpen = false;
+      this.$toast?.success("用户保存成功");
     },
     deleteUser(id) {
-      if (confirm("确定要删除这个用户吗？")) {
-        this.users = this.users.filter(user => user.id !== id);
+      if (confirm("确定删除该用户吗？")) {
+        this.users = this.users.filter(u => u.id !== id);
+        this.$toast?.success("用户删除成功");
       }
     },
-    updateUserStatus(user) {
-      console.log(`用户 ${user.username} 状态已更新为 ${user.status ? '启用' : '禁用'}`);
+    updateUserStatus(item) {
+      this.$toast?.success(`用户 ${item.username} 状态已更新`);
     },
-    approveContent(id) {
-      const content = this.contents.find(c => c.id === id);
-      if (content) content.status = "approved";
-    },
-    rejectContent(id) {
-      const content = this.contents.find(c => c.id === id);
-      if (content) content.status = "rejected";
-    },
-    saveSettings() {
-      this.$toast.success("设置已保存");
-    },
+
+    // ========== 公告管理功能 ==========
     openAnnouncementDialog() {
       this.editingAnnouncement = null;
       this.currentAnnouncement = { title: "", content: "", published: false };
       this.announcementDialogOpen = true;
     },
-    editAnnouncement(announcement) {
-      this.editingAnnouncement = announcement.id;
-      this.currentAnnouncement = { ...announcement };
+    editAnnouncement(item) {
+      this.editingAnnouncement = item.id;
+      this.currentAnnouncement = { ...item };
       this.announcementDialogOpen = true;
     },
     saveAnnouncement() {
-      const currentDate = new Date().toISOString().split("T")[0];
+      const now = new Date().toISOString().split("T")[0];
       if (this.editingAnnouncement) {
         const index = this.announcements.findIndex(a => a.id === this.editingAnnouncement);
-        this.currentAnnouncement.updated = currentDate;
+        this.currentAnnouncement.updated = now;
         this.announcements.splice(index, 1, this.currentAnnouncement);
+        this.$toast?.success("公告更新成功");
       } else {
         this.currentAnnouncement.id = Date.now();
-        this.currentAnnouncement.created = currentDate;
-        this.currentAnnouncement.updated = currentDate;
+        this.currentAnnouncement.created = now;
+        this.currentAnnouncement.updated = now;
         this.announcements.push(this.currentAnnouncement);
+        this.$toast?.success("公告发布成功");
       }
       this.announcementDialogOpen = false;
-      this.$toast.success(this.editingAnnouncement ? "公告已更新" : "公告已发布");
     },
     deleteAnnouncement(id) {
-      if (confirm("确定要删除这个公告吗？")) {
-        this.announcements = this.announcements.filter(announcement => announcement.id !== id);
-        this.$toast.success("公告已删除");
+      if (confirm("确定删除该公告吗？")) {
+        this.announcements = this.announcements.filter(a => a.id !== id);
+        this.$toast?.success("公告删除成功");
       }
     },
-    toggleAnnouncementStatus(announcement) {
-      announcement.published = !announcement.published;
-      announcement.updated = new Date().toISOString().split("T")[0];
-      this.$toast.success(`公告已${announcement.published ? '发布' : '取消发布'}`);
+    toggleAnnouncementStatus(item) {
+      item.published = !item.published;
+      item.updated = new Date().toISOString().split("T")[0];
+      this.$toast?.success(`公告已${item.published ? '发布' : '取消发布'}`);
+    },
+
+    /*
+      加载待审核行程（对接后端 /api/admin/all_pending_trips）
+     */
+    async loadPendingTrips() {
+      this.loading = true;
+      try {
+        const res = await axios.get('/api/admin/all_pending_trips');
+        // 后端返回结构：{success: true, data: {trips: [], count: ...}}
+        const backendTripList = res.data?.data?.trips || [];
+        // 确保是数组（避免后端返回非数组类型）
+        const validTrips = Array.isArray(backendTripList) ? backendTripList : [];
+
+        // 映射后端字段到前端表格
+        this.contents = validTrips.map(item => ({
+          trip_id: item.trip_id, // 后端行程ID
+          title: item.title || '未命名行程',
+          username: item.owner_username || '未知用户', // 后端关联的用户名
+          destination: item.destination || '未知目的地',
+          publish_status: item.publish_status || 'pending', // 审核状态
+          create_time: item.created_at 
+            ? new Date(item.created_at).toLocaleDateString() 
+            : new Date().toLocaleDateString() // 提交时间
+        }));
+        console.log("成功加载待审核行程:", this.contents);
+      } catch (error) {
+        console.error("加载待审核行程失败:", error);
+        this.contents = [];
+        this.$toast?.error("加载待审核行程失败，请重试");
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    /**
+     * 处理行程审核（对接审核+发消息API）
+     * @param {number} tripId - 行程ID
+     * @param {string} action - accept/reject
+     */
+    async handleReview(tripId, action) {
+      if (this.auditingIds.includes(tripId)) return;
+      this.auditingIds.push(tripId);
+
+      try {
+        // 获取管理员ID（从登录信息中读取）
+        const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const senderId = userInfo.user_id || userInfo.id || 1;
+
+        // 1. 调用审核API（/api/admin/pending）
+        const reviewParams = new URLSearchParams();
+        reviewParams.append('trip_id', tripId);
+        reviewParams.append('status', action);
+        await axios.post('/api/admin/pending', reviewParams, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        // 2. 调用发消息API（/api/admin/send_message）
+        const msgParams = new URLSearchParams();
+        msgParams.append('sender_id', senderId);
+        msgParams.append('trip_id', tripId);
+        msgParams.append('status', action);
+        await axios.post('/api/admin/send_message', msgParams, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        // 操作成功提示+刷新数据
+        this.$toast?.success(`行程${tripId}已${action === 'accept' ? '审核通过' : '审核拒绝'}，已通知用户`);
+        this.loadPendingTrips();
+      } catch (error) {
+        console.error(`审核行程${tripId}失败:`, error);
+        this.$toast?.error(`行程${tripId}审核失败，请重试`);
+      } finally {
+        this.auditingIds = this.auditingIds.filter(id => id !== tripId);
+      }
+    },
+
+    /**
+     * 审核状态文本映射
+     */
+    getStatusText(status) {
+      switch (status) {
+        case 'pending': return '待审核';
+        case 'published': return '已通过';
+        case 'rejected': return '已拒绝';
+        default: return '未知状态';
+      }
+    },
+
+    /**
+     * 审核状态颜色映射
+     */
+    getStatusColor(status) {
+      switch (status) {
+        case 'pending': return 'orange';
+        case 'published': return 'green';
+        case 'rejected': return 'red';
+        default: return 'grey';
+      }
+    },
+
+    // ==========公告管理核心方法 ==========
+    /**
+     * 1. 打开发布公告弹窗（清空表单数据）
+     */
+    openAnnouncementDialog() {
+      this.editingAnnouncement = null; // 标记为“发布”而非“编辑”
+      this.currentAnnouncement = { // 重置表单数据
+        title: "",
+        content: "",
+        published: true // 默认勾选“立即发布”
+      };
+      this.announcementDialogOpen = true; // 显示弹窗
+    },
+
+    /**
+     * 2. 保存公告（发布/编辑）- 只保留对接后端的逻辑，删除旧的假数据逻辑
+     */
+    async saveAnnouncement() {
+      const { title, content, published } = this.currentAnnouncement;
+      // 表单校验：标题和内容不能为空
+      if (!title.trim() || !content.trim()) {
+        this.$toast?.warning("公告标题和内容不能为空！");
+        return;
+      }
+
+      this.announcementLoading = true;
+      try {
+        // 获取管理员ID（从登录信息取，无则默认1，测试用）
+        const userInfo = JSON.parse(sessionStorage.getItem('user') || '{}');
+        const adminId = userInfo.user_id || userInfo.id || 1; // 兜底避免报错
+
+        // 构造FormData（后端要求的表单格式）
+        const formData = new URLSearchParams();
+        formData.append('title', title); // 公告标题
+        formData.append('content', content); // 公告内容
+        formData.append('admin_id', adminId); // 管理员ID
+        formData.append('is_active', published ? 1 : 0); // 发布状态（1=发布，0=草稿）
+
+        // 对接后端发布接口：POST /api/notice/create_notice
+        await axios.post(
+          '/api/notice/create_notice',
+          formData,
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        // 操作成功：关闭弹窗+刷新公告列表+提示
+        this.announcementDialogOpen = false;
+        this.$toast?.success("公告发布成功！");
+        this.loadAllAnnouncements(); // 刷新列表显示新公告
+      } catch (error) {
+        console.error("发布公告失败：", error.response?.data || error.message);
+        // 提示具体错误（后端返回的错误信息）
+        this.$toast?.error("发布失败：" + (error.response?.data?.detail || "服务器错误，请检查后端配置"));
+      } finally {
+        this.announcementLoading = false;
+      }
+    },
+
+    /**
+     * 3. 加载所有公告
+     */
+    async loadAllAnnouncements() {
+      this.announcementLoading = true;
+      try {
+        // 对接后端真实接口路径 /api/notice/all_notice_info
+        const res = await axios.get('/api/notice/all_notice_info');
+        
+        // 后端返回格式是 {success: true, data: {notice: [], count: ...}}
+        const noticeList = res.data?.data?.notice || [];
+        
+        // 映射后端字段到前端（后端是 notice_id、title、content、created_at）
+        this.announcements = noticeList.map(item => ({
+          notice_id: item.notice_id, // 后端公告ID
+          title: item.title, // 后端标题
+          content: item.content, // 后端内容
+          published: item.is_active === 1, // 后端 is_active（1=发布，0=未发布）
+          create_time: item.created_at ? new Date(item.created_at).toLocaleDateString() : '' // 后端创建时间
+        }));
+        console.log("成功加载公告：", this.announcements);
+      } catch (error) {
+        console.error("加载公告失败：", error.response?.data || error.message);
+        this.announcements = [];
+        this.$toast?.error("加载公告失败：" + (error.response?.data?.detail || "接口调用错误"));
+      } finally {
+        this.announcementLoading = false;
+      }
+    },
+
+    /**
+     * 3. 切换公告发布状态
+     */
+    async toggleAnnouncementStatus(item) {
+      this.announcementLoading = true;
+      try {
+        // 修复：对接后端更新公告接口 /api/notice/update_notice
+        const formData = new URLSearchParams();
+        formData.append('notice_id', item.notice_id); // 后端必填：公告ID
+        formData.append('title', item.title); // 后端必填：标题（更新时需传原标题）
+        formData.append('content', item.content); // 后端必填：内容（更新时需传原内容）
+        formData.append('is_active', item.published ? 0 : 1); // 切换状态：1=发布，0=未发布
+
+        await axios.post(
+          '/api/notice/update_notice',
+          formData,
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        // 本地刷新状态
+        this.announcements = this.announcements.map(notice => 
+          notice.notice_id === item.notice_id 
+            ? { ...notice, published: !item.published } 
+            : notice
+        );
+        this.$toast?.success(`公告已${!item.published ? '发布' : '取消发布'}`);
+      } catch (error) {
+        console.error("切换公告状态失败：", error.response?.data || error.message);
+        this.$toast?.error("切换状态失败：" + (error.response?.data?.detail || error.message));
+      } finally {
+        this.announcementLoading = false;
+      }
+    },
+
+    /**
+     * 4. 删除公告
+     */
+    async deleteAnnouncement(noticeId) {
+      if (!confirm("确定删除该公告吗？删除后无法恢复！")) return;
+
+      try {
+        // 对接后端删除接口 /api/notice/delete_notice
+        const formData = new URLSearchParams();
+        formData.append('notice_id', noticeId); // 后端必填：公告ID
+
+        await axios.post(
+          '/api/notice/delete_notice',
+          formData,
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        this.announcements = this.announcements.filter(notice => notice.notice_id !== noticeId);
+        this.$toast?.success("公告删除成功");
+      } catch (error) {
+        console.error("删除公告失败：", error.response?.data || error.message);
+        this.$toast?.error("删除失败：" + (error.response?.data?.detail || error.message));
+      }
     }
   }
 };
 </script>
 
 <style scoped>
-::v-deep .v-data-table thead {
-  display: table-header-group !important; /* 强制渲染表头组 */
+:deep(.v-data-table thead) {
+  display: table-header-group !important;
   visibility: visible !important;
 }
-
-::v-deep .v-data-table th.v-data-table-header__cell {
+:deep(.v-data-table th.v-data-table-header__cell) {
   display: table-cell !important;
-  height: 56px !important; /* 标准表头高度 */
+  height: 56px !important;
   min-height: 56px !important;
-  padding: 0 16px !important; /* 内边距，避免文字截断 */
-  color: #675096 !important; /* 主题色 */
+  padding: 0 16px !important;
+  color: #675096 !important;
   font-weight: 600 !important;
-  border-bottom: 2px solid #DBD1EF !important; /* 表头底部边框，醒目 */
+  border-bottom: 2px solid #DBD1EF !important;
 }
-
-/* 表格内容垂直居中，避免布局错乱 */
-::v-deep .v-data-table td.v-data-table__cell {
+:deep(.v-data-table td.v-data-table__cell) {
   vertical-align: middle !important;
   padding: 12px 16px !important;
 }
-
-/* 修复公告表格操作列拥挤问题（之前 150px 导致布局错乱） */
-::v-deep .announcement-table .v-data-table__cell:last-child {
-  min-width: 200px !important; /* 给操作列留足够宽度 */
+:deep(.announcement-table .v-data-table__cell:last-child) {
+  min-width: 200px !important;
 }
 
+/* 原有样式完全保留 */
 .action-group {
   display: flex;
-  gap: 12px; /* 按钮之间保持固定间距 */
+  gap: 12px;
 }
-
 .action-btn {
   margin-left: 12px;
 }
-
 .admin-container {
   min-height: 100vh;
   background-color: #FAFAFA;
 }
-
 .admin-layout {
   display: flex;
 }
-
-/* 解决内容被遮挡问题 */
 .admin-content {
   padding: 24px;
-  margin-left: 250px; /* Drawer */
-  margin-top: 64px;   /* AppBar */
+  margin-left: 250px;
+  margin-top: 64px;
   width: calc(100% - 250px);
   box-sizing: border-box;
 }
-/* 左侧导航栏固定宽度，不收缩 */
 .v-navigation-drawer {
   width: 250px !important;
   flex-shrink: 0;
-  height: calc(100vh - 64px) !important; /* 与主内容区高度一致 */
+  height: calc(100vh - 64px) !important;
 }
-
-/* 主内容区：避开左侧导航栏 + 顶部间距 */
 .admin-content {
   padding: 24px 32px;
   flex: 1;
-  max-width: calc(100% - 250px); /* 减去左侧导航栏宽度 */
+  max-width: calc(100% - 250px);
   width: 100%;
   box-sizing: border-box;
 }
-
-/* 统计卡片样式（保持不变） */
 .stats-row {
   margin-bottom: 24px;
 }
@@ -611,8 +844,6 @@ export default {
 .negative {
   color: #e53935;
 }
-
-/* 内容区域样式（保持不变） */
 .admin-card {
   border-color: #DBD1EF;
   background-color: white;
@@ -625,8 +856,6 @@ export default {
   flex-wrap: wrap;
   gap: 16px;
 }
-
-/* 通知角标（保持不变） */
 .notification-badge {
   position: absolute;
   top: 8px;
@@ -641,14 +870,10 @@ export default {
   align-items: center;
   justify-content: center;
 }
-
-/* 侧边栏选中项样式（保持不变） */
 .selected-item {
   background-color: rgba(116, 45, 216, 0.1);
   border-right: 4px solid #742DD8;
 }
-
-/* 响应式适配（保持不变） */
 @media (max-width: 600px) {
   .admin-content {
     padding: 16px;
