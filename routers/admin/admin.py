@@ -616,10 +616,11 @@ async def all_pending_trips():
         # 2.查询用户信息
         query = """
             SELECT 
-                *
-            FROM trip 
-            WHERE publish_status != 'draft'
-            ORDER BY created_at DESC
+            t.*, u.username AS owner_username  -- 新增：从user_info表取username，别名owner_username
+            FROM trip t
+            LEFT JOIN user_info u ON t.owner_user_id = u.user_id  -- 关联user_info表（用LEFT JOIN避免行程无用户时查询失败）
+            WHERE t.publish_status != 'draft' 
+            ORDER BY t.created_at DESC
         """
         cursor.execute(query)
         trips = cursor.fetchall()
@@ -732,36 +733,37 @@ async def pending(trip_id: str = Form(...), status: str = Form(...)):
 async def send_message(sender_id: str = Form(...), trip_id: str = Form(...), status: str = Form(...)):
     db_conn = None
     cursor = None
-    original_status = status  # 保存原始状态用于返回信息
-    user_id = None  # 用于保存行程所属用户的ID
+    original_status = status
+    user_id = None
+    message_sent = False  # 记录消息发送状态
 
     try:
+        # 转换并验证参数类型
         try:
             trip_id_int = int(trip_id)
+            sender_id_int = int(sender_id)  # 转换sender_id为整数
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail="行程ID必须是数字"
+                detail="行程ID和发送者ID必须是数字"
             )
 
-        # 验证status参数是否有效
         if original_status not in ['accept', 'reject']:
             raise HTTPException(
                 status_code=400,
                 detail="status参数必须是'accept'或'reject'"
             )
 
-        # 1.连接数据库
+        # 连接数据库
         db_conn = connect_db()
         if not db_conn:
             raise HTTPException(
                 status_code=500,
                 detail="数据库连接失败"
             )
-
         cursor = db_conn.cursor(dictionary=True)
 
-        # 2.先查询行程信息，获取用户ID
+        # 查询行程信息
         check_query = """
             SELECT trip_id, owner_user_id, title 
             FROM trip 
@@ -779,38 +781,53 @@ async def send_message(sender_id: str = Form(...), trip_id: str = Form(...), sta
         user_id = trip.get('owner_user_id')
         trip_title = trip.get('title', '未知行程')
 
-        # 3.发送消息给用户
+        # 发送消息
         if user_id:
             try:
-                message_content = ""
+                # 构建消息内容
                 if original_status == 'accept':
                     message_content = f"您的行程 '{trip_title}' 审核已通过！"
-                else:  # reject
+                else:
                     message_content = f"您的行程 '{trip_title}' 审核未通过，请检查内容后重新提交。"
                 
+                # 修正表名为message（与delete_user接口一致），并调整参数占位符
                 query = """
-                INSERT INTO messages (sender_id, receiver_id, title, content, created_at, is_read, read_at)
-                VALUES (%s, %s, "行程审核通知", %s, NOW(), 0, NULL)
+                INSERT INTO message (sender_id, receiver_id, title, content, created_at, is_read, read_at)
+                VALUES (%s, %s, %s, %s, NOW(), 0, NULL)
                 """
-                cursor.execute(query, (sender_id, user_id, f"行程审核结果 - {trip_title}", message_content))
+                # 参数顺序：sender_id, receiver_id, title, content（与字段顺序一致）
+                cursor.execute(
+                    query, 
+                    (sender_id_int, user_id, f"行程审核结果 - {trip_title}", message_content)
+                )
                 db_conn.commit()
+                message_sent = True  # 标记发送成功
                 
             except Exception as message_error:
-                # 如果发送消息失败，记录日志但不中断主流程
+                db_conn.rollback()  # 消息插入失败时回滚
                 print(f"发送消息失败: {str(message_error)}")
 
-        return {"message": f"消息已发送给用户 {user_id} 关于行程 {trip_id}"}
+        # 返回包含发送状态的结果
+        return {
+            "message": f"消息处理完成",
+            "details": {
+                "user_id": user_id,
+                "trip_id": trip_id,
+                "message_sent": message_sent,
+                "reason": "成功" if message_sent else "发送失败（详情见服务器日志）"
+            }
+        }
 
     except HTTPException as he:
         if db_conn:
-            db_conn.rollback()  # 回滚事务
+            db_conn.rollback()
         raise he
     except Exception as e:
         if db_conn:
-            db_conn.rollback()  # 回滚事务
+            db_conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"处理审核失败: {str(e)}"
+            detail=f"处理审核消息失败: {str(e)}"
         )
     finally:
         if cursor:
