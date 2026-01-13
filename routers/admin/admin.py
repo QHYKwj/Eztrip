@@ -596,3 +596,224 @@ async def get_user_count():
             cursor.close()
         if db_conn and db_conn.is_connected():
             db_conn.close()
+
+@router.get("/all_pending_trips")  #查询审核api
+async def all_pending_trips():
+    db_conn = None
+    cursor = None
+
+    try:
+        # 1.连接数据库
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(
+                status_code=500,
+                detail="数据库连接失败"
+            )
+
+        cursor = db_conn.cursor(dictionary=True)
+
+        # 2.查询用户信息
+        query = """
+            SELECT 
+                *
+            FROM trip 
+            WHERE publish_status != 'draft'
+            ORDER BY created_at DESC
+        """
+        cursor.execute(query)
+        trips = cursor.fetchall()
+
+        # 3.返回结果
+        return {
+            "success": True,
+            "data": {
+                "trips": trips,
+                "count": len(trips)
+            }
+        }
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"审核查询失败: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+
+@router.post("/pending")  # 审核api
+async def pending(trip_id: str = Form(...), status: str = Form(...)):
+    db_conn = None
+    cursor = None
+    original_status = status  # 保存原始状态用于返回信息
+
+    try:
+        try:
+            user_id_int = int(trip_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="用户ID必须是数字"
+            )
+
+        # 验证status参数是否有效
+        if original_status not in ['accept', 'reject']:
+            raise HTTPException(
+                status_code=400,
+                detail="status参数必须是'accept'或'reject'"
+            )
+
+        # 1.连接数据库
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(
+                status_code=500,
+                detail="数据库连接失败"
+            )
+
+        cursor = db_conn.cursor(dictionary=True)
+
+        # 2.更改trip信息
+        if original_status == 'accept':
+            db_status = 'published'
+        else:  # original_status == 'reject'
+            db_status = 'rejected'
+
+        # 先检查trip是否存在
+        check_query = "SELECT trip_id FROM trip WHERE trip_id = %s"
+        cursor.execute(check_query, (user_id_int,))
+        trip = cursor.fetchone()
+        
+        if not trip:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到ID为{trip_id}的行程"
+            )
+
+        # 更新trip状态
+        update_query = """
+            UPDATE trip 
+            SET publish_status = %s
+            WHERE trip_id = %s
+        """
+        cursor.execute(update_query, (db_status, user_id_int))
+        db_conn.commit()  # 提交事务
+
+        # 3.返回结果
+        if original_status == 'accept':
+            return {"message": f"accept trip {trip_id}"}
+        else:  # original_status == 'reject'
+            return {"message": f"reject trip {trip_id}"}
+
+    except HTTPException as he:
+        if db_conn:
+            db_conn.rollback()  # 回滚事务
+        raise he
+    except Exception as e:
+        if db_conn:
+            db_conn.rollback()  # 回滚事务
+        raise HTTPException(
+            status_code=500,
+            detail=f"处理审核失败: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+@router.post("/send_message")  # 发消息api
+async def send_message(sender_id: str = Form(...), trip_id: str = Form(...), status: str = Form(...)):
+    db_conn = None
+    cursor = None
+    original_status = status  # 保存原始状态用于返回信息
+    user_id = None  # 用于保存行程所属用户的ID
+
+    try:
+        try:
+            trip_id_int = int(trip_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="行程ID必须是数字"
+            )
+
+        # 验证status参数是否有效
+        if original_status not in ['accept', 'reject']:
+            raise HTTPException(
+                status_code=400,
+                detail="status参数必须是'accept'或'reject'"
+            )
+
+        # 1.连接数据库
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(
+                status_code=500,
+                detail="数据库连接失败"
+            )
+
+        cursor = db_conn.cursor(dictionary=True)
+
+        # 2.先查询行程信息，获取用户ID
+        check_query = """
+            SELECT trip_id, owner_user_id, title 
+            FROM trip 
+            WHERE trip_id = %s
+        """
+        cursor.execute(check_query, (trip_id_int,))
+        trip = cursor.fetchone()
+        
+        if not trip:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到ID为{trip_id}的行程"
+            )
+        
+        user_id = trip.get('owner_user_id')
+        trip_title = trip.get('title', '未知行程')
+
+        # 3.发送消息给用户
+        if user_id:
+            try:
+                message_content = ""
+                if original_status == 'accept':
+                    message_content = f"您的行程 '{trip_title}' 审核已通过！"
+                else:  # reject
+                    message_content = f"您的行程 '{trip_title}' 审核未通过，请检查内容后重新提交。"
+                
+                query = """
+                INSERT INTO messages (sender_id, receiver_id, title, content, created_at, is_read, read_at)
+                VALUES (%s, %s, "行程审核通知", %s, NOW(), 0, NULL)
+                """
+                cursor.execute(query, (sender_id, user_id, f"行程审核结果 - {trip_title}", message_content))
+                db_conn.commit()
+                
+            except Exception as message_error:
+                # 如果发送消息失败，记录日志但不中断主流程
+                print(f"发送消息失败: {str(message_error)}")
+
+        return {"message": f"消息已发送给用户 {user_id} 关于行程 {trip_id}"}
+
+    except HTTPException as he:
+        if db_conn:
+            db_conn.rollback()  # 回滚事务
+        raise he
+    except Exception as e:
+        if db_conn:
+            db_conn.rollback()  # 回滚事务
+        raise HTTPException(
+            status_code=500,
+            detail=f"处理审核失败: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
