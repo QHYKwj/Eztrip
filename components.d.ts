@@ -23,6 +23,7 @@ declare module 'vue' {
     SearchBar: typeof import('./src/components/SearchBar.vue')['default']
     SwiperCard: typeof import('./src/components/SwiperCard.vue')['default']
     TripCard: typeof import('./src/components/TripCard.vue')['default']
+    TripMapInteractive: typeof import('./src/components/TripMapInteractive.vue')['default']
     TripPlanBoard: typeof import('./src/components/TripPlanBoard.vue')['default']
   }
 }

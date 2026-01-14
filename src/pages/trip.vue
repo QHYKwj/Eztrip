@@ -171,13 +171,24 @@
             <v-card-title class="text-subtitle-2 text-grey-darken-1">目的地地图</v-card-title>
             <v-card-text class="pa-0 flex-grow-1">
               <v-skeleton-loader v-if="mapLoading" height="100%" type="image" />
-              <v-img
+<!--              <v-img-->
+<!--                v-else-->
+<!--                class="bg-grey-lighten-3 fill-height"-->
+<!--                cover-->
+<!--                min-height="400"-->
+<!--                :src="mapUrl"-->
+<!--              />-->
+              <TripMapInteractive
                 v-else
-                class="bg-grey-lighten-3 fill-height"
-                cover
-                min-height="400"
-                :src="mapUrl"
+                :lng="Number(tripDetail.lng)"
+                :lat="Number(tripDetail.lat)"
+                :zoom="14"
+                :enable-search="true"
+                :pickable="true"
+                :markers="tagMarkers"
+                @pick="handleMapPick"
               />
+
             </v-card-text>
           </v-card>
         </v-col>
@@ -194,12 +205,13 @@
 <script>
   import axios from 'axios'
   import TripPlanBoard from '@/components/TripPlanBoard.vue'
-
+  import TripMapInteractive from '@/components/TripMapInteractive.vue'
   export default {
+    components: { TripMapInteractive,TripPlanBoard},
     name: 'Trip',
     data () {
       return {
-
+        tagMarkers: [], // 未来你从后端取“某个 trip 的 tag 点位列表”
         // 收藏状态
         favorited: false,
         favoriting: false,
@@ -328,6 +340,11 @@
     },
 
     methods: {
+      handleMapPick(p) {
+        // p = {lng, lat, name?}
+        // 你可以：弹窗问“要不要把这个点作为一个tag加入第X天”
+        console.log('用户点选坐标：', p)
+      },
       syncRouteParams () {
         this.tripId = this.$route.params.tripId
       },
