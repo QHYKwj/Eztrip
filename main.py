@@ -16,6 +16,7 @@ from routers.user_message import notifications
 from routers.collect import collect_trip
 from routers.admin import admin
 from routers.trip_detail import trip
+from routers.model import model_api 
 app = FastAPI(title="FastAPI Login Example")
 
 
@@ -35,9 +36,12 @@ app.include_router(notifications.router)#用户是否已读
 # 管理员相关路由
 app.include_router(admin.router)
 app.include_router(notice.router)#管理员的公告操作
+# 大模型相关路由
+app.include_router(model_api.router)#大模型接口
 
 #trip.vue
 app.include_router(trip.router)#行程具体的信息和编辑
+
 
 # for r in app.routes:
 #     if hasattr(r, "methods"):
