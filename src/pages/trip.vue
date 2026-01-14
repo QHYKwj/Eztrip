@@ -154,14 +154,84 @@
                 </v-row>
               </template>
 
-              <template v-else />
+              <template v-else>
+                <v-form v-model="formValid">
+                  <v-row>
+                    <v-col class="py-2" cols="12">
+                      <v-text-field
+                        v-model="editForm.trip_name"
+                        density="comfortable"
+                        label="行程名称"
+                        prepend-inner-icon="mdi-rename-box"
+                        :rules="[rules.required]"
+                        variant="outlined"
+                      />
+                    </v-col>
+
+                    <v-col class="py-2" cols="12">
+                      <v-text-field
+                        v-model="editForm.destination"
+                        density="comfortable"
+                        label="目的地"
+                        prepend-inner-icon="mdi-map-marker"
+                        :rules="[rules.required]"
+                        variant="outlined"
+                      />
+                    </v-col>
+
+                    <v-col class="py-2" cols="6">
+                      <v-text-field
+                        v-model="editForm.start_date"
+                        density="comfortable"
+                        label="开始日期"
+                        prepend-inner-icon="mdi-calendar-start"
+                        :rules="[rules.required, rules.date]"
+                        variant="outlined"
+                      />
+                    </v-col>
+
+                    <v-col class="py-2" cols="6">
+                      <v-text-field
+                        v-model="editForm.end_date"
+                        density="comfortable"
+                        label="结束日期"
+                        prepend-inner-icon="mdi-calendar-end"
+                        :rules="[rules.required, rules.date]"
+                        variant="outlined"
+                      />
+                    </v-col>
+
+                    <v-col class="py-2" cols="12">
+                      <v-switch
+                        v-model="editForm.is_public"
+                        color="success"
+                        inset
+                        label="是否公开"
+                      />
+                    </v-col>
+
+                    <v-col class="py-2" cols="12">
+                      <v-select
+                        v-model="editForm.publish_action"
+                        density="comfortable"
+                        item-title="text"
+                        item-value="value"
+                        :items="publishActions"
+                        label="发布操作"
+                        prepend-inner-icon="mdi-upload"
+                        variant="outlined"
+                      />
+                    </v-col>
+                  </v-row>
+                </v-form>
+              </template>
             </v-card-text>
           </v-card>
           <div class="mt-4">
             <TripPlanBoard
-              :user-id="userId"
-              :trip-id="tripId"
               :editable="canEdit"
+              :trip-id="tripId"
+              :user-id="userId"
             />
           </div>
         </v-col>
@@ -171,21 +241,21 @@
             <v-card-title class="text-subtitle-2 text-grey-darken-1">目的地地图</v-card-title>
             <v-card-text class="pa-0 flex-grow-1">
               <v-skeleton-loader v-if="mapLoading" height="100%" type="image" />
-<!--              <v-img-->
-<!--                v-else-->
-<!--                class="bg-grey-lighten-3 fill-height"-->
-<!--                cover-->
-<!--                min-height="400"-->
-<!--                :src="mapUrl"-->
-<!--              />-->
+              <!--              <v-img-->
+              <!--                v-else-->
+              <!--                class="bg-grey-lighten-3 fill-height"-->
+              <!--                cover-->
+              <!--                min-height="400"-->
+              <!--                :src="mapUrl"-->
+              <!--              />-->
               <TripMapInteractive
                 v-else
-                :lng="Number(tripDetail.lng)"
-                :lat="Number(tripDetail.lat)"
-                :zoom="14"
                 :enable-search="true"
-                :pickable="true"
+                :lat="Number(tripDetail.lat)"
+                :lng="Number(tripDetail.lng)"
                 :markers="tagMarkers"
+                :pickable="true"
+                :zoom="14"
                 @pick="handleMapPick"
               />
 
@@ -204,11 +274,11 @@
 
 <script>
   import axios from 'axios'
-  import TripPlanBoard from '@/components/TripPlanBoard.vue'
   import TripMapInteractive from '@/components/TripMapInteractive.vue'
+  import TripPlanBoard from '@/components/TripPlanBoard.vue'
   export default {
-    components: { TripMapInteractive,TripPlanBoard},
     name: 'Trip',
+    components: { TripMapInteractive, TripPlanBoard },
     data () {
       return {
         tagMarkers: [], // 未来你从后端取“某个 trip 的 tag 点位列表”
@@ -340,7 +410,7 @@
     },
 
     methods: {
-      handleMapPick(p) {
+      handleMapPick (p) {
         // p = {lng, lat, name?}
         // 你可以：弹窗问“要不要把这个点作为一个tag加入第X天”
         console.log('用户点选坐标：', p)
