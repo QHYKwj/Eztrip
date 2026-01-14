@@ -60,6 +60,11 @@ def to_str(x):
     return str(x)
 
 
+from fastapi import APIRouter, HTTPException, Query
+from config.connect_db import connect_db
+
+router = APIRouter(prefix="/api/trip", tags=["trip_details"])
+
 @router.get("/detail")
 async def trip_detail(
         user_id: int = Query(..., description="当前登录用户 user_id"),
@@ -73,6 +78,7 @@ async def trip_detail(
             raise HTTPException(status_code=500, detail="Failed to connect database")
         cursor = db_conn.cursor(dictionary=True)
 
+        # ✅ 关键：可见性 = owner 或收藏过 或（公开且已发布）
         sql = """
             SELECT
                 t.trip_id,
@@ -87,13 +93,19 @@ async def trip_detail(
                 t.review_comment,
                 t.is_public,
                 t.class,
+
                 tf.user_id AS fav_user_id,
                 IF(tf.user_id IS NULL, 0, 1) AS is_collected
+
             FROM trip t
             LEFT JOIN trip_favorite tf
               ON tf.trip_id = t.trip_id AND tf.user_id = %s
             WHERE t.trip_id = %s
-              AND (t.owner_user_id = %s OR tf.user_id IS NOT NULL)
+              AND (
+                    t.owner_user_id = %s
+                 OR tf.user_id IS NOT NULL
+                 OR (t.is_public = 1 AND t.publish_status = 'published')
+              )
             LIMIT 1;
         """
         cursor.execute(sql, (user_id, trip_id, user_id))
@@ -122,10 +134,10 @@ async def trip_detail(
             "is_public": int(trip["is_public"]) == 1,
 
             "is_collected": bool(trip["is_collected"]),
-            "is_owner": owner_id == uid,              # ✅ 关键：这里必须正确
+            "is_owner": owner_id == uid,        # ✅ owner 才能编辑
             "is_favorited": trip["fav_user_id"] is not None,
 
-            "class": str(trip["class"]) if trip["class"] is not None else None,
+            "class": int(trip["class"]) if trip["class"] is not None else None,
             "lng": lng,
             "lat": lat,
         }
@@ -139,6 +151,7 @@ async def trip_detail(
             cursor.close()
         if db_conn and db_conn.is_connected():
             db_conn.close()
+
 
 
 # 高德静态地图基础 URL

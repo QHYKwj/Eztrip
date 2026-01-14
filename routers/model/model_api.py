@@ -84,7 +84,10 @@
 #     print(completion.usage)
 
 from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import StreamingResponse
 from openai import OpenAI
+import os
+import json
 
 router = APIRouter(prefix="/api/model", tags=["model"])
 
@@ -127,16 +130,98 @@ async def chat_with_model(prompt: str = Form(...)):
             status_code=500,
             detail=f"大模型调用失败: {str(e)}"
         )
-  
 
-import requests
+def sse_pack(data: dict) -> str:
+    """
+    把 dict 打包成 SSE 格式
+    """
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-# url = "http://127.0.0.1:8000/api/model"
+@router.post("/stream")
+async def chat_with_model_stream(prompt: str = Form(...)):
+    """
+    流式对话接口（SSE）
+    前端通过 fetch 读取 stream 并实时显示
+    """
+    if not prompt or not prompt.strip():
+        raise HTTPException(status_code=400, detail="提示词不能为空")
+
+    def gen():
+        try:
+            # ✅ stream=True 开启流式
+            stream = client.chat.completions.create(
+                model="deepseek-v3.2",
+                messages=[{"role": "user", "content": prompt}],
+                stream=True
+            )
+
+            # 可选：先告诉前端“开始了”
+            yield sse_pack({"type": "start"})
+
+            for event in stream:
+                # OpenAI-compatible 流式增量：delta.content
+                delta = event.choices[0].delta
+                if delta and getattr(delta, "content", None):
+                    yield sse_pack({"type": "delta", "content": delta.content})
+
+            yield sse_pack({"type": "done"})
+        except Exception as e:
+            # SSE 里也要把错误返回给前端，否则前端只会断流
+            yield sse_pack({"type": "error", "message": str(e)})
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-# # 发送 GET 请求
-# response = requests.post(url, data={"prompt": "请问从北京到广州可以选择哪些交通方式？"})
+SYSTEM_PROMPT = """
+你是“旅游行程推荐平台”的行程规划专家。你的任务是根据用户输入，生成可直接在前端渲染的行程方案。
+必须遵守：
+1) 输出必须是严格 JSON（不要 Markdown，不要多余文本）。
+2) 必须包含：best_time（推荐季节/月份+原因）、days（天数）、overview（100字内概述）、
+   schedule（每天：day、morning/afternoon/evening，每段包含：title、spots、duration_hours、transport、notes）、
+   food（当地必吃/推荐商圈）、tips（至少5条）、packing（行李清单）、budget（按经济/舒适两档给区间）。
+3) 如果用户信息不足（例如：城市、天数、出行时间、预算、偏好），不要反问一堆；你要做“合理默认”，
+   同时在 tips 里列出你采用了哪些默认假设。
+4) 景点必须尽量具体（如“外滩”“豫园”“迪士尼”这类），并给出建议游玩时段与预计用时。
+5) 时间安排要现实：一天最多3-4个核心点；要考虑交通与排队；热门点提示“建议预约/错峰”。
+"""
 
-# print("状态码:", response.status_code)
-# print("响应内容:", response.text)
-# print("JSON 响应:", response.json())
+def safe_json_load(s: str):
+    """
+    处理偶发的模型输出前后夹杂文本的情况，尽量截取 JSON。
+    """
+    s = s.strip()
+    if s.startswith("{") and s.endswith("}"):
+        return json.loads(s)
+    # 尝试截取第一个 { 到最后一个 }
+    l = s.find("{")
+    r = s.rfind("}")
+    if l != -1 and r != -1 and r > l:
+        return json.loads(s[l:r+1])
+    raise ValueError("模型未返回有效JSON")
+
+@router.post("/struct")
+async def chat_with_model(prompt: str = Form(...)):
+    try:
+        if not prompt.strip():
+            raise HTTPException(status_code=400, detail="提示词不能为空")
+
+        completion = client.chat.completions.create(
+            model="deepseek-v3.2",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ],
+            stream=False
+        )
+
+        content = completion.choices[0].message.content
+
+        # ✅ 强制解析成 JSON，前端更稳
+        data = safe_json_load(content)
+
+        return {"response": data}
+
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"模型输出解析失败: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"大模型调用失败: {str(e)}")
