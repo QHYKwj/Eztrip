@@ -91,12 +91,12 @@
     </v-row>
     <div v-else class="trip-body">
       <v-row class="d-flex align-stretch fill-height">
-        <v-col cols="12" md="5" class="d-flex">
+        <v-col class="d-flex flex-column" cols="12" md="5">
           <v-card class="rounded-lg shadow-sm border w-100" elevation="0">
             <v-card-title class="d-flex align-center justify-space-between bg-grey-lighten-4 py-3">
               <span class="text-subtitle-1 font-weight-bold">行程基本信息</span>
               <v-chip v-if="showFavoriteCount" color="primary" size="small" variant="flat">
-                <v-icon start icon="mdi-heart" size="14"></v-icon>
+                <v-icon icon="mdi-heart" size="14" start />
                 {{ favoriteCount }} 人收藏
               </v-chip>
             </v-card-title>
@@ -104,61 +104,86 @@
             <v-card-text class="pa-6">
               <template v-if="!editing">
                 <v-row>
-                  <v-col cols="12" class="py-3">
+                  <v-col class="py-3" cols="12">
                     <div class="text-subtitle-1 text-grey-darken-1">行程名称</div>
                     <div class="text-h6 font-weight-bold">{{ tripDetail.trip_name }}</div>
                   </v-col>
 
-                  <v-col cols="12" class="py-3">
+                  <v-col class="py-3" cols="12">
                     <div class="text-subtitle-1 text-grey-darken-1">目的地</div>
                     <div class="text-h6 font-weight-bold">
-                      <v-icon color="primary" class="mr-1">mdi-map-marker</v-icon>
+                      <v-icon class="mr-1" color="primary">mdi-map-marker</v-icon>
                       {{ tripDetail.destination }}
                     </div>
                   </v-col>
 
-                  <v-col cols="6" class="py-3">
+                  <v-col class="py-3" cols="6">
                     <div class="text-subtitle-1 text-grey-darken-1">开始日期</div>
                     <div class="text-body-1 font-weight-medium">{{ tripDetail.start_date }}</div>
                   </v-col>
 
-                  <v-col cols="6" class="py-3">
+                  <v-col class="py-3" cols="6">
                     <div class="text-subtitle-1 text-grey-darken-1">结束日期</div>
                     <div class="text-body-1 font-weight-medium">{{ tripDetail.end_date }}</div>
                   </v-col>
 
-                  <v-col cols="12" class="py-3">
+                  <v-col class="py-3" cols="12">
                     <div class="text-subtitle-1 text-grey-darken-1">审核状态</div>
-                    <v-chip :color="statusColor" size="small" label class="mt-1">
+                    <v-chip class="mt-1" :color="statusColor" label size="small">
                       {{ statusText }}
                     </v-chip>
                   </v-col>
+                  <v-col class="py-2" cols="12">
+                    <v-btn
+                      block
+                      :color="favorited ? 'grey-darken-1' : 'red-darken-1'"
+                      :loading="favoriting"
+                      :prepend-icon="favorited ? 'mdi-heart-off' : 'mdi-heart'"
+                      variant="elevated"
+                      @click="toggleFavorite"
+                    >
+                      {{ favorited ? '取消收藏' : '收藏行程' }}
+                    </v-btn>
+
+                    <!-- 烟花画布（覆盖在卡片内部底部，不影响布局） -->
+                    <div v-show="fireworks.show" class="fireworks-wrap">
+                      <canvas ref="fireCanvas" class="fireworks-canvas" />
+                    </div>
+                  </v-col>
+
                 </v-row>
               </template>
 
-              <template v-else>
-              </template>
+              <template v-else />
             </v-card-text>
           </v-card>
+          <div class="mt-4">
+            <TripPlanBoard
+              :user-id="userId"
+              :trip-id="tripId"
+              :editable="canEdit"
+            />
+          </div>
         </v-col>
 
-        <v-col cols="12" md="7" class="d-flex">
+        <v-col class="d-flex" cols="12" md="7">
           <v-card class="rounded-lg border w-100 d-flex flex-column" elevation="0">
             <v-card-title class="text-subtitle-2 text-grey-darken-1">目的地地图</v-card-title>
             <v-card-text class="pa-0 flex-grow-1">
-              <v-skeleton-loader v-if="mapLoading" type="image" height="100%" />
+              <v-skeleton-loader v-if="mapLoading" height="100%" type="image" />
               <v-img
                 v-else
-                :src="mapUrl"
-                cover
                 class="bg-grey-lighten-3 fill-height"
+                cover
                 min-height="400"
+                :src="mapUrl"
               />
             </v-card-text>
           </v-card>
         </v-col>
       </v-row>
     </div>
+
     <!-- 保存结果提示 -->
     <v-snackbar v-model="snack.show" :color="snack.color" timeout="2200">
       {{ snack.text }}
@@ -168,11 +193,25 @@
 
 <script>
   import axios from 'axios'
+  import TripPlanBoard from '@/components/TripPlanBoard.vue'
 
   export default {
     name: 'Trip',
     data () {
       return {
+
+        // 收藏状态
+        favorited: false,
+        favoriting: false,
+        favoriteIds: new Set(),
+        favoriteIdsLoaded: false,
+
+        fireworks: {
+          show: false,
+          rafId: null,
+          timer: null,
+        },
+
         userId: null,
         tripId: null,
         tripDetail: null,
@@ -257,16 +296,35 @@
     },
 
     watch: {
-      '$route.params.tripId' () {
-        this.syncRouteParams()
-        this.fetchTripDetail()
+      '$route.params.tripId': {
+        async handler () {
+          this.syncRouteParams()
+
+          // ✅ 重置 UI 状态（防止旧页面残留）
+          this.stopFireworks()
+          this.favorited = false
+          this.favoriting = false
+          this.mapUrl = ''
+          this.favoriteCount = 0
+          this.tripDetail = null
+          this.error = null
+          this.editing = false
+
+          await this.fetchTripDetail()
+        },
       },
     },
 
-    created () {
+    async created () {
       this.userId = this.getUserIdFromStorage()
       this.syncRouteParams()
-      this.fetchTripDetail()
+
+      // 先拉收藏列表（兜底），再拉详情
+      await this.fetchUserFavoriteIds()
+      await this.fetchTripDetail()
+    },
+    beforeUnmount () {
+      this.stopFireworks()
     },
 
     methods: {
@@ -339,6 +397,14 @@
 
           // 后端已经是“扁平结构”，不需要 res.data.data
           this.tripDetail = res.data
+          // ✅ 初始化收藏状态：优先用详情接口 is_collected
+          this.favorited = !!this.tripDetail?.is_collected
+
+          // ✅ 兜底：如果已加载过收藏集合，也用集合再确认一次（防字段不一致）
+          if (this.favoriteIdsLoaded && this.userId) {
+            const tid = Number(this.tripId)
+            if (this.favoriteIds.has(tid)) this.favorited = true
+          }
 
           // 地图
           if (this.tripDetail.lng && this.tripDetail.lat) {
@@ -452,6 +518,266 @@
         this.editForm.end_date = this.formatYMD(val)
         this.menuEnd = false
       },
+      getUserId () {
+        // 你已经有 getUserIdFromStorage，但这里收藏逻辑用这个更通用
+        const raw = sessionStorage.getItem('user') || localStorage.getItem('user')
+        if (!raw) return null
+        try {
+          const u = JSON.parse(raw)
+          return u.user_id || u.id || null
+        } catch {
+          return null
+        }
+      },
+
+      // ✅ 获取“当前用户收藏的 trip_id 列表”（带 sessionStorage 缓存）
+      async fetchUserFavoriteIds () {
+        const userId = this.getUserId()
+        if (!userId) {
+          this.favoriteIds = new Set()
+          this.favoriteIdsLoaded = true
+          return
+        }
+
+        const cacheKey = `favorite_trip_ids_${userId}`
+        const ttlMs = 60 * 1000
+
+        // 1) 读缓存
+        try {
+          const cachedRaw = sessionStorage.getItem(cacheKey)
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw)
+            if (cached?.ts && Array.isArray(cached?.trip_ids) && (Date.now() - cached.ts) < ttlMs) {
+              this.favoriteIds = new Set(cached.trip_ids.map(Number))
+              this.favoriteIdsLoaded = true
+              return
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // 2) 请求后端
+        try {
+          const res = await axios.post('/api/collect/favorite/list', { user_id: userId })
+          if (res.data?.code === 200 && Array.isArray(res.data?.data?.trip_ids)) {
+            const ids = res.data.data.trip_ids.map(Number)
+            this.favoriteIds = new Set(ids)
+            this.favoriteIdsLoaded = true
+            sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), trip_ids: ids }))
+          } else {
+            this.favoriteIds = new Set()
+            this.favoriteIdsLoaded = true
+          }
+        } catch (error) {
+          console.error('获取用户收藏列表失败:', error)
+          this.favoriteIds = new Set()
+          this.favoriteIdsLoaded = true
+        }
+      },
+
+      // ✅ 统一入口：收藏/取消收藏切换
+      async toggleFavorite () {
+        const userId = this.getUserId()
+        const tripId = Number(this.tripId)
+
+        if (!userId) {
+          this.showSnack('请先登录再收藏', 'error')
+          return
+        }
+        if (!tripId) {
+          this.showSnack('行程ID缺失，无法操作', 'error')
+          return
+        }
+
+        // 防重复点击
+        if (this.favoriting) return
+
+        await (this.favorited ? this.unfavoriteTrip(userId, tripId) : this.favoriteTrip(userId, tripId))
+      },
+
+      // ✅ 收藏
+      async favoriteTrip (userId, tripId) {
+        this.favoriting = true
+        try {
+          const res = await axios.post('/api/collect/favorite/add', {
+            user_id: userId,
+            trip_id: tripId,
+          })
+
+          if (res.data?.code === 200) {
+            this.favorited = true
+
+            // 同步本地集合 + 缓存
+            const cacheKey = `favorite_trip_ids_${userId}`
+            this.favoriteIds.add(Number(tripId))
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              ts: Date.now(),
+              trip_ids: Array.from(this.favoriteIds),
+            }))
+
+            this.showSnack('收藏成功 🎉', 'success')
+            await this.fetchFavoriteCount()
+            this.playFireworks()
+            return
+          }
+
+          this.showSnack(res.data?.message || '收藏失败', 'warning')
+        } catch (error) {
+          // 400 = 重复收藏（你已说明）
+          if (error.response?.status === 400) {
+            this.favorited = true
+            const cacheKey = `favorite_trip_ids_${userId}`
+            this.favoriteIds.add(Number(tripId))
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              ts: Date.now(),
+              trip_ids: Array.from(this.favoriteIds),
+            }))
+            this.showSnack('你已经收藏过这个行程啦 ❤️', 'info')
+            await this.fetchFavoriteCount()
+            return
+          }
+
+          console.error('收藏失败:', error)
+          this.showSnack('收藏失败，请稍后再试', 'error')
+        } finally {
+          this.favoriting = false
+        }
+      },
+
+      // ✅ 取消收藏
+      async unfavoriteTrip (userId, tripId) {
+        this.favoriting = true
+        try {
+          const res = await axios.post('/api/collect/favorite/remove', {
+            user_id: userId,
+            trip_id: tripId,
+          })
+
+          if (res.data?.code === 200) {
+            this.favorited = false
+
+            // 同步本地集合 + 缓存
+            const cacheKey = `favorite_trip_ids_${userId}`
+            this.favoriteIds.delete(Number(tripId))
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              ts: Date.now(),
+              trip_ids: Array.from(this.favoriteIds),
+            }))
+
+            this.showSnack('已取消收藏', 'success')
+            await this.fetchFavoriteCount()
+            return
+          }
+
+          this.showSnack(res.data?.message || '取消失败', 'warning')
+        } catch (error) {
+          // 400 = 未收藏无需取消
+          if (error.response?.status === 400) {
+            this.favorited = false
+            const cacheKey = `favorite_trip_ids_${userId}`
+            this.favoriteIds.delete(Number(tripId))
+            sessionStorage.setItem(cacheKey, JSON.stringify({
+              ts: Date.now(),
+              trip_ids: Array.from(this.favoriteIds),
+            }))
+            this.showSnack('你还没收藏这个行程', 'info')
+            await this.fetchFavoriteCount()
+            return
+          }
+
+          console.error('取消收藏失败:', error)
+          this.showSnack('取消失败，请稍后再试', 'error')
+        } finally {
+          this.favoriting = false
+        }
+      },
+
+      // =======================
+      // 🎆 烟花效果（canvas 粒子）
+      // =======================
+      playFireworks () {
+        this.stopFireworks()
+        this.fireworks.show = true
+
+        this.$nextTick(() => {
+          const canvas = this.$refs.fireCanvas
+          if (!canvas) return
+
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = Math.floor(rect.width)
+          canvas.height = Math.floor(rect.height)
+
+          const ctx = canvas.getContext('2d')
+          const W = canvas.width
+          const H = canvas.height
+
+          const particles = []
+          const bursts = 4
+          for (let b = 0; b < bursts; b++) {
+            const cx = W * (0.25 + 0.5 * Math.random())
+            const cy = H * (0.25 + 0.35 * Math.random())
+            const n = 60
+            for (let i = 0; i < n; i++) {
+              const a = Math.random() * Math.PI * 2
+              const sp = 2 + Math.random() * 4
+              particles.push({
+                x: cx,
+                y: cy,
+                vx: Math.cos(a) * sp,
+                vy: Math.sin(a) * sp,
+                life: 60 + Math.random() * 30,
+                r: 2 + Math.random() * 2,
+                color: ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#b388ff'][Math.floor(Math.random() * 5)],
+              })
+            }
+          }
+
+          const step = () => {
+            ctx.clearRect(0, 0, W, H)
+            ctx.globalCompositeOperation = 'lighter'
+
+            for (const p of particles) {
+              p.life -= 1
+              p.vx *= 0.98
+              p.vy *= 0.98
+              p.vy += 0.06
+              p.x += p.vx
+              p.y += p.vy
+
+              if (p.life > 0) {
+                ctx.beginPath()
+                ctx.fillStyle = p.color
+                ctx.globalAlpha = Math.max(0, p.life / 90)
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+                ctx.fill()
+              }
+            }
+
+            ctx.globalAlpha = 1
+            ctx.globalCompositeOperation = 'source-over'
+
+            if (particles.some(p => p.life > 0)) {
+              this.fireworks.rafId = requestAnimationFrame(step)
+            }
+          }
+
+          step()
+
+          this.fireworks.timer = setTimeout(() => {
+            this.stopFireworks()
+          }, 2200)
+        })
+      },
+
+      stopFireworks () {
+        if (this.fireworks.rafId) cancelAnimationFrame(this.fireworks.rafId)
+        if (this.fireworks.timer) clearTimeout(this.fireworks.timer)
+        this.fireworks.rafId = null
+        this.fireworks.timer = null
+        this.fireworks.show = false
+      },
+
     },
   }
 </script>
@@ -483,4 +809,19 @@
   flex: 1;
   min-height: calc(100vh - 64px - 48px);
 }
+.fireworks-wrap {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fireworks-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 </style>

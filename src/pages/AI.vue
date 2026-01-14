@@ -109,6 +109,8 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   name: "AIChatPage",
   data() {
@@ -120,7 +122,7 @@ export default {
         backgroundColor: "#742DD8",
         borderRadius: "16px 16px 4px 16px",
         padding: "12px 16px",
-        maxWidth: "100%", // ✅ 扩宽气泡
+        maxWidth: "100%",
         lineHeight: "1.6",
         wordBreak: "break-word",
         whiteSpace: "pre-wrap",
@@ -140,62 +142,84 @@ export default {
     };
   },
   methods: {
-    sendMessage() {
+    async sendMessage() {
       const content = this.inputMessage.trim();
       if (!content || this.isLoading) return;
+
+      // 1) 先把用户消息放入列表
       const userMsg = {
         role: "user",
         content,
-        timestamp: new Date().getTime()
+        timestamp: Date.now()
       };
       this.chatMessages.push(userMsg);
       this.inputMessage = "";
       this.scrollToBottom();
+
+      // 2) 调用后端
       this.isLoading = true;
-      setTimeout(() => {
-        const aiReply = this.getAIReply(content);
+
+      try {
+        // FastAPI 这里是 Form(...)，所以必须用 FormData 或 x-www-form-urlencoded
+        const formData = new FormData();
+        formData.append("prompt", content);
+
+        // ✅ 改成你后端地址（同域可写 ""；跨域就写 http://127.0.0.1:8000 之类）
+        const res = await axios.post("/api/model", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data"
+          },
+          timeout: 60000
+        });
+
+        // 你的后端返回： { "response": "..." }
+        const aiText = res?.data?.response ?? "（模型没有返回内容）";
+
         const aiMsg = {
           role: "ai",
-          content: aiReply,
-          timestamp: new Date().getTime()
+          content: aiText,
+          timestamp: Date.now()
         };
         this.chatMessages.push(aiMsg);
+      } catch (err) {
+        // 3) 错误也给一个气泡提示
+        const msg =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "请求失败：未知错误";
+
+        this.chatMessages.push({
+          role: "ai",
+          content: `⚠️ 调用失败：${msg}`,
+          timestamp: Date.now()
+        });
+      } finally {
         this.isLoading = false;
         this.scrollToBottom();
-      }, 1500);
-    },
-    getAIReply(userInput) {
-      const lowerInput = userInput.toLowerCase();
-      if (lowerInput.includes("行程") || lowerInput.includes("旅游") || lowerInput.includes("旅行")) {
-        return "为你推荐通用行程模板：\n1. 第一天：抵达目的地 → 入住酒店 → 晚上逛当地夜市\n2. 第二天：核心景点打卡（建议提前在官方平台预约门票）\n3. 第三天：体验当地美食 + 文化体验（如博物馆、民俗村）\n需要我帮你生成具体城市（如上海、三亚）的3天2晚行程吗？";
-      } else if (lowerInput.includes("ai") || lowerInput.includes("智能") || lowerInput.includes("你是谁")) {
-        return "我是你的专属 AI 助手，基于大语言模型开发～ 可以帮你：\n• 生成旅行行程\n• 解答日常问题\n• 整理笔记/文案\n• 提供生活建议\n你有具体需求可以详细告诉我哦！";
-      } else if (lowerInput.includes("你好") || lowerInput.includes("hi") || lowerInput.includes("hello")) {
-        return "你好呀！😊 很高兴能为你服务～ 有什么需要我帮忙的吗？可以试试让我帮你规划行程哦！";
-      } else if (lowerInput.includes("天气") || lowerInput.includes("温度")) {
-        return "抱歉，我目前无法获取实时天气～ 你可以告诉我具体城市和出行日期，我会帮你在行程中备注天气相关的注意事项（如带雨伞、防晒用品等）！";
-      } else {
-        return "感谢你的提问！我已经记录了你的需求～\n如果需要更精准的回答，可以补充更多细节（比如具体城市、出行天数、需求偏好等），我会为你提供更有针对性的帮助！";
       }
     },
+
     scrollToBottom() {
       this.$nextTick(() => {
         const chatHistory = this.$refs.chatHistory;
         if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
       });
     },
+
     formatTime(timestamp) {
       const date = new Date(timestamp);
       const hours = String(date.getHours()).padStart(2, "0");
       const minutes = String(date.getMinutes()).padStart(2, "0");
       return `${hours}:${minutes}`;
     },
+
     clearChat() {
       this.chatMessages = [];
     }
   }
 };
 </script>
+
 
 <style scoped>
 .ai-chat-container {

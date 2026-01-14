@@ -8,7 +8,7 @@
     <!-- ✅ 给 Menu 加 ref，方便创建行程后刷新 -->
     <Menu ref="menu" />
     <div class="page-container">
-      <router-view />
+      <router-view :key="$route.name + '-' + ($route.params.tripId || '')" />
     </div>
     <CreateTripDialog
       v-model="showDialog"
