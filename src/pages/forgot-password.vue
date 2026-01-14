@@ -48,90 +48,94 @@
     </div>
   </div>
 </template>
+
 <script>
-import axios from 'axios'
+  import axios from 'axios'
 
-export default {
-  data () {
-    return {
-      valid: true,
+  export default {
+    data () {
+      return {
+        valid: true,
+        name: '',
+        email: '',
+        password: '',
 
-      name: 'zhangsan',
-      email: '123@123.com',
-      password: '',
+        nameRules: [
+          v => !!v || 'Name is required',
+        ],
 
-      nameRules: [
-        v => !!v || 'Name is required',
-      ],
+        emailRules: [
+          v => !!v || 'E-mail is required',
+          v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
+        ],
 
-      emailRules: [
-        v => !!v || 'E-mail is required',
-        v => /.+@.+\..+/.test(v) || 'E-mail must be valid',
-      ],
-
-      passwordRules: [
-        v => !!v || 'Password is required',
-        
-      ],
-    }
-  },
-
-  computed: {
-    nameErrors () {
-      return this.nameRules
-        .filter(rule => rule(this.name) !== true)
-        .map(rule => rule(this.name))
-    },
-    emailErrors () {
-      return this.emailRules
-        .filter(rule => rule(this.email) !== true)
-        .map(rule => rule(this.email))
-    },
-    passwordErrors () {
-      return this.passwordRules
-        .filter(rule => rule(this.password) !== true)
-        .map(rule => rule(this.password))
-    },
-  },
-
-  methods: {
-    async resetPassword () {
-      const { valid } = await this.$refs.form.validate()
-      if (!valid) {
-        alert('请检查输入内容')
-        return
-      }
-
-      const formData = new URLSearchParams()
-      formData.append('username', this.name)
-      formData.append('email', this.email)
-      formData.append('new_password', this.password)
-
-      try {
-            await axios.post(
-      '/api/user/change_password',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    )
-
-
-        alert('密码重置成功，请重新登录')
-        this.$router.push('/')
-      } catch (err) {
-        console.error(err)
-        alert('重置失败，请稍后重试')
+        passwordRules: [
+          v => !!v || 'Password is required',
+          v => v.length >= 6 || 'Password must be at least 6 characters long',
+        ],
       }
     },
-  },
-}
+
+    computed: {
+      nameErrors () {
+        return this.nameRules
+          .filter(rule => rule(this.name) !== true)
+          .map(rule => rule(this.name))
+      },
+      emailErrors () {
+        return this.emailRules
+          .filter(rule => rule(this.email) !== true)
+          .map(rule => rule(this.email))
+      },
+      passwordErrors () {
+        return this.passwordRules
+          .filter(rule => rule(this.password) !== true)
+          .map(rule => rule(this.password))
+      },
+    },
+
+    methods: {
+      async resetPassword () {
+        const { valid } = await this.$refs.form.validate()
+        if (!valid) {
+          alert('Please check your input.')
+          return
+        }
+
+        const formData = new URLSearchParams()
+        formData.append('username', this.name)
+        formData.append('email', this.email)
+        formData.append('new_password', this.password)
+
+        try {
+          // Ensure that your backend URL is correct
+          const response = await axios.post(
+            '/api/user/change_password',
+            formData,
+            {
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+            },
+          )
+
+          alert(response.data.message || 'Password changed successfully. Please log in again.')
+          this.$router.push('/')
+        } catch (error) {
+          console.error(error)
+          if (error.response && error.response.data) {
+            alert(error.response.data.detail || 'Failed to reset password. Please try again later.')
+          } else {
+            alert('An unknown error occurred. Please try again later.')
+          }
+        }
+      },
+    },
+  }
 </script>
 
 <style scoped>
-/* 背景部分 */
+/* Background styles */
 html, body {
   height: 100%;
   margin: 0;
@@ -141,7 +145,8 @@ html, body {
   position: relative;
   height: 100%;
 }
-.background,.background1 {
+
+.background, .background1 {
   position: absolute;
   top: 0;
   left: 0;
@@ -150,7 +155,8 @@ html, body {
   z-index: 1;
   overflow: hidden;
 }
-.background{
+
+.background {
   content: '';
   position: absolute;
   top: 0%;
@@ -164,7 +170,8 @@ html, body {
   animation: moveBackground 30s linear infinite;
   filter: blur(2px);
 }
-.background1{
+
+.background1 {
   content: '';
   position: absolute;
   top: 0%;
@@ -179,6 +186,7 @@ html, body {
   filter: blur(0px);
   opacity: 0.4;
 }
+
 @keyframes moveBackground {
   0% {
     background-position: 0% 0%;
@@ -189,30 +197,27 @@ html, body {
 }
 
 .background2 {
-  position: absolute; /* 确保它覆盖在 background 上 */
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8),rgba(70, 130, 180, 0.8)); /* 蓝紫渐变色 */
-  z-index: 2; /* 在背景和内容之间 */
+  background: linear-gradient(to bottom, rgba(138, 43, 226, 0.8), rgba(70, 130, 180, 0.8));
+  z-index: 2;
 }
 
-/* 让登录框居中并变成正方形 */
 .content {
   position: relative;
   z-index: 3;
 }
+
 .login-card {
   width: 100%;
   max-width: 400px;
   margin: 0 auto;
   padding: 30px;
   border-radius: 15px;
-  background-color: rgba(255, 255, 255, 0.8); /* 半透明白色背景 */
-  flex-direction: column; /* 垂直排列元素 */
-  align-items: center; /* 水平居中对齐 */
-  justify-content: center; /* 垂直居中对齐 */
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 .logo {
@@ -226,11 +231,8 @@ html, body {
   height: 100vh;
 }
 
-/* 其他样式 */
 .v-btn {
   width: 100%;
   margin-bottom: 10px;
 }
 </style>
-
-
