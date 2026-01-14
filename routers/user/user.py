@@ -314,7 +314,7 @@ async def change_password(username: str = Form(...), email: str = Form() , new_p
 
         # 3.检查用户名和邮箱是否正确
         select_query = "SELECT * FROM user_info WHERE username = %s and email = %s;"
-        cursor.execute(select_query, (new_password, username, email,))
+        cursor.execute(select_query, (username, email))
 
         if not cursor.fetchone():
             raise HTTPException(

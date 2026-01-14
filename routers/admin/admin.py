@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Form
 from pydantic import BaseModel
 from datetime import datetime
 from config.connect_db import connect_db
-
+from typing import Optional
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/trips/pending")
@@ -46,7 +46,7 @@ class ReviewBody(BaseModel):
     admin_user_id: int
     trip_id: int
     action: str  # approve / reject
-    comment: str | None = None
+    comment:  Optional[str] = None
 
 @router.post("/trips/review")
 async def review_trip(body: ReviewBody):
@@ -144,62 +144,96 @@ async def all_user_info():
         if db_conn and db_conn.is_connected():
             db_conn.close()
 
-@router.get("/content_count")  # 修改为GET请求，因为这是获取数据而不是创建数据
+# 1. 修改获取内容统计接口，增加“今日新增”逻辑
+@router.get("/content_count")
 async def get_content_count():
     db_conn = None
     cursor = None
     try:
-        # 1.连接数据库
         db_conn = connect_db()
-        # 连接失败
         if not db_conn:
-            raise HTTPException(
-                status_code = 500,
-                detail = "Failed to connect database"
-            )
+            raise HTTPException(status_code=500, detail="Failed to connect database")
 
-        cursor = db_conn.cursor(dictionary=True)  # 修改为布尔值True
+        cursor = db_conn.cursor(dictionary=True)
 
-        # 2.查看内容总数
-        select_query = "SELECT COUNT(*) as total_count FROM trip;"
-        cursor.execute(select_query)
+        # 1. 获取所有行程总数
+        cursor.execute("SELECT COUNT(*) as total_count FROM trip")
+        total_res = cursor.fetchone()
+        content_count = total_res.get('total_count', 0) if total_res else 0
 
-        # 获取查询结果
-        result = cursor.fetchone()
+        # 2. 获取今日新增行程数 (利用 CURDATE() 函数)
+        cursor.execute("SELECT COUNT(*) as today_count FROM trip WHERE DATE(created_at) = CURDATE()")
+        today_res = cursor.fetchone()
+        today_new_count = today_res.get('today_count', 0) if today_res else 0
 
-        if result:
-            content_count = result.get('total_count', 0)
-
-            # 返回内容数
-            return {
-                "success": True,
-                "data": {
-                    "content_count": content_count
-                }
+        return {
+            "success": True,
+            "data": {
+                "content_count": content_count,
+                "today_new_count": today_new_count  # ✅ 新增字段
             }
-        else:
-            return {
-                "success": True,
-                "data": {
-                    "content_count": 0
-                }
-            }
+        }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        if db_conn:
-            db_conn.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"获取内容数失败: {str(e)}"
-        )
+        if db_conn: db_conn.rollback()
+        raise HTTPException(status_code=500, detail=f"获取内容统计失败: {str(e)}")
     finally:
-        # 确保资源被正确释放
-        if cursor:
-            cursor.close()
-        if db_conn and db_conn.is_connected():
-            db_conn.close()
+        if cursor: cursor.close()
+        if db_conn: db_conn.close()
+
+
+# 2. 优化待审核列表接口：优化排序和日期格式
+@router.get("/all_pending_trips")
+async def all_pending_trips():
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="数据库连接失败")
+
+        cursor = db_conn.cursor(dictionary=True)
+
+        # ✅ 优化排序：PENDING 的排在最前面，然后按时间倒序
+        # CASE WHEN 用于自定义排序权重
+        query = """
+            SELECT 
+                t.*, u.username AS owner_username 
+            FROM trip t
+            LEFT JOIN user_info u ON t.owner_user_id = u.user_id 
+            WHERE t.publish_status != 'draft' 
+            ORDER BY 
+                CASE WHEN t.publish_status = 'pending' THEN 0 ELSE 1 END, 
+                t.created_at DESC
+        """
+        cursor.execute(query)
+        trips = cursor.fetchall()
+
+        # ✅ 统一日期格式，防止前端解析出错
+        for trip in trips:
+            # 处理创建时间
+            if trip.get('created_at'):
+                trip['created_at'] = trip['created_at'].strftime("%Y-%m-%d") # 只显示年月日即可，更简洁
+            
+            # 处理开始/结束日期
+            if trip.get('start_date'):
+                trip['start_date'] = str(trip['start_date'])
+            if trip.get('end_date'):
+                trip['end_date'] = str(trip['end_date'])
+
+        return {
+            "success": True,
+            "data": {
+                "trips": trips,
+                "count": len(trips)
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"审核查询失败: {str(e)}")
+    finally:
+        if cursor: cursor.close()
+        if db_conn: db_conn.close()
 
 @router.post("/delete_user")
 async def delete_user(user_id: str = Form(...)):
@@ -597,55 +631,6 @@ async def get_user_count():
         if db_conn and db_conn.is_connected():
             db_conn.close()
 
-@router.get("/all_pending_trips")  #查询审核api
-async def all_pending_trips():
-    db_conn = None
-    cursor = None
-
-    try:
-        # 1.连接数据库
-        db_conn = connect_db()
-        if not db_conn:
-            raise HTTPException(
-                status_code=500,
-                detail="数据库连接失败"
-            )
-
-        cursor = db_conn.cursor(dictionary=True)
-
-        # 2.查询用户信息
-        query = """
-            SELECT 
-                *
-            FROM trip 
-            WHERE publish_status != 'draft'
-            ORDER BY created_at DESC
-        """
-        cursor.execute(query)
-        trips = cursor.fetchall()
-
-        # 3.返回结果
-        return {
-            "success": True,
-            "data": {
-                "trips": trips,
-                "count": len(trips)
-            }
-        }
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"审核查询失败: {str(e)}"
-        )
-    finally:
-        if cursor:
-            cursor.close()
-        if db_conn and db_conn.is_connected():
-            db_conn.close()
-
 
 @router.post("/pending")  # 审核api
 async def pending(trip_id: str = Form(...), status: str = Form(...)):
@@ -732,36 +717,37 @@ async def pending(trip_id: str = Form(...), status: str = Form(...)):
 async def send_message(sender_id: str = Form(...), trip_id: str = Form(...), status: str = Form(...)):
     db_conn = None
     cursor = None
-    original_status = status  # 保存原始状态用于返回信息
-    user_id = None  # 用于保存行程所属用户的ID
+    original_status = status
+    user_id = None
+    message_sent = False  # 记录消息发送状态
 
     try:
+        # 转换并验证参数类型
         try:
             trip_id_int = int(trip_id)
+            sender_id_int = int(sender_id)  # 转换sender_id为整数
         except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail="行程ID必须是数字"
+                detail="行程ID和发送者ID必须是数字"
             )
 
-        # 验证status参数是否有效
         if original_status not in ['accept', 'reject']:
             raise HTTPException(
                 status_code=400,
                 detail="status参数必须是'accept'或'reject'"
             )
 
-        # 1.连接数据库
+        # 连接数据库
         db_conn = connect_db()
         if not db_conn:
             raise HTTPException(
                 status_code=500,
                 detail="数据库连接失败"
             )
-
         cursor = db_conn.cursor(dictionary=True)
 
-        # 2.先查询行程信息，获取用户ID
+        # 查询行程信息
         check_query = """
             SELECT trip_id, owner_user_id, title 
             FROM trip 
@@ -779,38 +765,53 @@ async def send_message(sender_id: str = Form(...), trip_id: str = Form(...), sta
         user_id = trip.get('owner_user_id')
         trip_title = trip.get('title', '未知行程')
 
-        # 3.发送消息给用户
+        # 发送消息
         if user_id:
             try:
-                message_content = ""
+                # 构建消息内容
                 if original_status == 'accept':
                     message_content = f"您的行程 '{trip_title}' 审核已通过！"
-                else:  # reject
+                else:
                     message_content = f"您的行程 '{trip_title}' 审核未通过，请检查内容后重新提交。"
                 
+                # 修正表名为message（与delete_user接口一致），并调整参数占位符
                 query = """
-                INSERT INTO messages (sender_id, receiver_id, title, content, created_at, is_read, read_at)
-                VALUES (%s, %s, "行程审核通知", %s, NOW(), 0, NULL)
+                INSERT INTO message (sender_id, receiver_id, title, content, created_at, is_read, read_at)
+                VALUES (%s, %s, %s, %s, NOW(), 0, NULL)
                 """
-                cursor.execute(query, (sender_id, user_id, f"行程审核结果 - {trip_title}", message_content))
+                # 参数顺序：sender_id, receiver_id, title, content（与字段顺序一致）
+                cursor.execute(
+                    query, 
+                    (sender_id_int, user_id, f"行程审核结果 - {trip_title}", message_content)
+                )
                 db_conn.commit()
+                message_sent = True  # 标记发送成功
                 
             except Exception as message_error:
-                # 如果发送消息失败，记录日志但不中断主流程
+                db_conn.rollback()  # 消息插入失败时回滚
                 print(f"发送消息失败: {str(message_error)}")
 
-        return {"message": f"消息已发送给用户 {user_id} 关于行程 {trip_id}"}
+        # 返回包含发送状态的结果
+        return {
+            "message": f"消息处理完成",
+            "details": {
+                "user_id": user_id,
+                "trip_id": trip_id,
+                "message_sent": message_sent,
+                "reason": "成功" if message_sent else "发送失败（详情见服务器日志）"
+            }
+        }
 
     except HTTPException as he:
         if db_conn:
-            db_conn.rollback()  # 回滚事务
+            db_conn.rollback()
         raise he
     except Exception as e:
         if db_conn:
-            db_conn.rollback()  # 回滚事务
+            db_conn.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"处理审核失败: {str(e)}"
+            detail=f"处理审核消息失败: {str(e)}"
         )
     finally:
         if cursor:
