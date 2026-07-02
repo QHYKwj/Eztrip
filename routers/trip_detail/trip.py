@@ -11,6 +11,8 @@ import urllib.parse
 from pydantic import BaseModel
 from config.connect_db import connect_db
 from datetime import datetime
+import json # 确保顶部引入了 json
+from typing import Optional, Dict, Any
 
 router = APIRouter(prefix="/api/trip", tags=["trip_details"])
 
@@ -93,6 +95,7 @@ async def trip_detail(
                 t.review_comment,
                 t.is_public,
                 t.class,
+                t.remarks,
 
                 tf.user_id AS fav_user_id,
                 IF(tf.user_id IS NULL, 0, 1) AS is_collected
@@ -118,6 +121,15 @@ async def trip_detail(
         owner_id = int(trip["owner_user_id"])
         uid = int(user_id)
 
+        # 🌟 核心修改：尝试解析 JSON 格式的 remarks
+        parsed_remarks = None
+        if trip.get("remarks"):
+            try:
+                parsed_remarks = json.loads(trip["remarks"])
+            except json.JSONDecodeError:
+                # 如果解析失败（兼容以前存入的纯 Markdown 文本），直接返回原字符串
+                parsed_remarks = trip["remarks"]
+
         return {
             "trip_id": int(trip["trip_id"]),
             "owner_user_id": owner_id,
@@ -138,6 +150,7 @@ async def trip_detail(
             "is_favorited": trip["fav_user_id"] is not None,
 
             "class": int(trip["class"]) if trip["class"] is not None else None,
+            "remarks": parsed_remarks, # <--- 给前端透传解析好的字典或原始字符串
             "lng": lng,
             "lat": lat,
         }
@@ -212,6 +225,7 @@ class TripUpdateBody(BaseModel):
     end_date: str    # YYYY-MM-DD
     is_public: int   # 0/1
     publish_action: str  # keep / submit / unpublish
+    remarks: Optional[Dict[str, Any]] = None  # ✅ 允许前端传回整个 JSON 对象
 
 
 def _parse_ymd(s: str) -> datetime:
@@ -264,26 +278,29 @@ async def update_trip(body: TripUpdateBody):
         elif body.publish_action == "unpublish":
             new_status = "draft"
 
+        # ✅ 将前端传来的字典转回 JSON 字符串
+        remarks_str = json.dumps(body.remarks, ensure_ascii=False) if body.remarks else None
+
         # ✅ 3) 更新
         if new_status:
             cursor.execute("""
                 UPDATE trip
                 SET title=%s, destination=%s, start_date=%s, end_date=%s,
-                    is_public=%s, publish_status=%s
+                    is_public=%s, publish_status=%s, remarks=%s
                 WHERE trip_id=%s
             """, (
                 body.trip_name, body.destination, body.start_date, body.end_date,
-                int(body.is_public), new_status, body.trip_id
+                int(body.is_public), new_status, remarks_str, body.trip_id
             ))
         else:
             cursor.execute("""
                 UPDATE trip
                 SET title=%s, destination=%s, start_date=%s, end_date=%s,
-                    is_public=%s
+                    is_public=%s, remarks=%s
                 WHERE trip_id=%s
             """, (
                 body.trip_name, body.destination, body.start_date, body.end_date,
-                int(body.is_public), body.trip_id
+                int(body.is_public), remarks_str, body.trip_id
             ))
 
         db_conn.commit()
@@ -319,6 +336,56 @@ async def favorite_count(trip_id: int = Query(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取收藏人数失败: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        if db_conn and db_conn.is_connected():
+            db_conn.close()
+
+@router.delete("/delete", summary="删除行程")
+async def delete_trip(
+        trip_id: int = Query(..., description="要删除的行程 ID"),
+        user_id: int = Query(..., description="当前操作的用户 ID")
+):
+    """
+    删除行程 API
+    逻辑：先判断是否存在及是否有权限（仅属主和管理员可删），然后先清空收藏记录，最后删除行程主表记录。
+    """
+    db_conn = None
+    cursor = None
+    try:
+        db_conn = connect_db()
+        if not db_conn:
+            raise HTTPException(status_code=500, detail="Failed to connect database")
+        cursor = db_conn.cursor(dictionary=True)
+
+        # 1. 校验行程是否存在及归属权
+        cursor.execute("SELECT owner_user_id FROM trip WHERE trip_id = %s", (trip_id,))
+        trip_record = cursor.fetchone()
+
+        if not trip_record:
+            raise HTTPException(status_code=404, detail="行程不存在")
+
+        # 权限校验：只有创建者本身，或者管理员（设定 admin_id = 1）可以删除
+        if int(trip_record["owner_user_id"]) != int(user_id) and int(user_id) != 1:
+            raise HTTPException(status_code=403, detail="无权删除该行程")
+
+        # 2. 安全删除机制
+        # 因为收藏表 trip_favorite 没有设置 ON DELETE CASCADE，必须先手动解除关联
+        cursor.execute("DELETE FROM trip_favorite WHERE trip_id = %s", (trip_id,))
+
+        # 3. 删除主表 (trip_day_plan 和 trip_day_item 有 CASCADE 级联约束，会自动销毁)
+        cursor.execute("DELETE FROM trip WHERE trip_id = %s", (trip_id,))
+
+        db_conn.commit()
+        return {"message": "行程删除成功", "code": 200}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db_conn:
+            db_conn.rollback()
+        raise HTTPException(status_code=500, detail=f"删除行程失败: {str(e)}")
     finally:
         if cursor:
             cursor.close()

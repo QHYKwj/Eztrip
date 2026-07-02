@@ -94,21 +94,23 @@ async def list_trips(user_id: int = Query(..., description="当前登录用户 u
             db_conn.close()
 
 
-
+from typing import Optional, Dict, Any
+import json
 class TripCreateBody(BaseModel):
     owner_user_id: int
     title: str = Field(..., min_length=1)
     destination: str = Field(..., min_length=1)
     start_date: str  # YYYY-MM-DD
     end_date: str    # YYYY-MM-DD
+    is_public: int = 0
     class_type: int = Field(..., ge=1, le=4)
-    remarks: Optional[str] = None  # ✅ 新增
-# 创建行程的路由
+    remarks: Optional[Dict[str, Any]] = None  # ✅ 成功接收前端传来的字典
+
 @router.post("/create")
 async def create_trip(body: TripCreateBody):
     """
-    创建一个新的行程（默认 publish_status='draft'，is_public 默认 1）。
-    写入 remarks（可选）。
+    创建一个新的行程。
+    写入 remarks（可选，若包含则转 JSON 存入）。
     """
     db_conn = None
     cursor = None
@@ -118,15 +120,23 @@ async def create_trip(body: TripCreateBody):
             raise HTTPException(status_code=500, detail="Failed to connect database")
         cursor = db_conn.cursor(dictionary=True)
 
-        # 可选：校验 class_type 是否合法
         if body.class_type not in CLASS_MAP:
             raise HTTPException(status_code=400, detail="Invalid class_type")
 
+        # 🌟 序列化 remarks
+        default_remarks = {
+            "overview": "", "best_time": "", "budget": "",
+            "accommodation": "", "food": "", "packing": [], "tips": []
+        }
+        final_remarks = body.remarks if body.remarks else default_remarks
+        remarks_json_str = json.dumps(final_remarks, ensure_ascii=False)
+
+        # ✅ 致命错误修复：对保留关键字 class 添加反引号 `class`
         sql = """
             INSERT INTO trip
-              (owner_user_id, title, destination, start_date, end_date, class, remarks)
+              (owner_user_id, title, destination, start_date, end_date, `class`, publish_status, is_public, remarks)
             VALUES
-              (%s, %s, %s, %s, %s, %s, %s);
+              (%s, %s, %s, %s, %s, %s, 'draft', %s, %s);
         """
         cursor.execute(sql, (
             body.owner_user_id,
@@ -135,13 +145,16 @@ async def create_trip(body: TripCreateBody):
             body.start_date,
             body.end_date,
             body.class_type,
-            body.remarks
+            body.is_public,
+            remarks_json_str  # ✅ 落库时转为 JSON 字符串
         ))
+
+        trip_id = cursor.lastrowid
         db_conn.commit()
 
         return {
             "message": "Trip created successfully",
-            "trip_id": cursor.lastrowid,
+            "trip_id": trip_id,
         }
 
     except HTTPException:
