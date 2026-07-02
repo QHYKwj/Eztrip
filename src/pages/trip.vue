@@ -144,13 +144,127 @@
                     >
                       {{ favorited ? '取消收藏' : '收藏行程' }}
                     </v-btn>
+                    <!-- 🌟 增加删除按钮 (仅拥有者或管理员 id=1 可见) 🌟 -->
+                    <v-btn
+                      v-if="canEdit || userId === 1"
+                      block
+                      color="error"
+                      prepend-icon="mdi-delete"
+                      variant="tonal"
+                      @click="confirmDeleteTrip"
+                    >
+                      删除此行程
+                    </v-btn>
 
                     <!-- 烟花画布（覆盖在卡片内部底部，不影响布局） -->
                     <div v-show="fireworks.show" class="fireworks-wrap">
                       <canvas ref="fireCanvas" class="fireworks-canvas" />
                     </div>
                   </v-col>
+                  <v-card
+                    v-if="tripDetail.remarks && typeof tripDetail.remarks === 'object'"
+                    class="rounded-lg shadow-sm border w-100 mt-4"
+                    elevation="0"
+                  >
+                    <v-card-title class="d-flex align-center py-3" style="background-color: #F3F2FD; color: #742DD8;">
+                      <v-icon class="mr-2" icon="mdi-robot-outline" />
+                      <span class="text-subtitle-1 font-weight-bold">行程贴士与避坑指南</span>
+                    </v-card-title>
 
+                    <v-card-text class="pa-5">
+                      <v-row>
+                        <!-- 概述与基本建议 -->
+                        <v-col cols="12" md="6">
+                          <div class="mb-4">
+                            <div class="text-subtitle-2 font-weight-bold mb-1 text-grey-darken-2">
+                              <v-icon class="mr-1" color="primary" size="small">mdi-flag-variant-outline</v-icon> 行程概述
+                            </div>
+                            <div class="text-body-2 text-grey-darken-1">{{ tripDetail.remarks.overview }}</div>
+                          </div>
+                          <div class="mb-4">
+                            <div class="text-subtitle-2 font-weight-bold mb-1 text-grey-darken-2">
+                              <v-icon class="mr-1" color="success" size="small">mdi-weather-partly-cloudy</v-icon> 最佳出行时间
+                            </div>
+                            <div class="text-body-2 text-grey-darken-1">{{ tripDetail.remarks.best_time }}</div>
+                          </div>
+                          <div class="mb-4">
+                            <div class="text-subtitle-2 font-weight-bold mb-1 text-grey-darken-2">
+                              <v-icon class="mr-1" color="warning" size="small">mdi-currency-cny</v-icon> 预估预算
+                            </div>
+                            <div class="text-body-2 text-grey-darken-1">{{ tripDetail.remarks.budget }}</div>
+                          </div>
+                        </v-col>
+
+                        <!-- 住宿与美食 -->
+                        <v-col cols="12" md="6">
+                          <div class="mb-4">
+                            <div class="text-subtitle-2 font-weight-bold mb-1 text-grey-darken-2">
+                              <v-icon class="mr-1" color="indigo" size="small">mdi-bed</v-icon> 住宿建议
+                            </div>
+                            <div class="text-body-2 text-grey-darken-1">{{ tripDetail.remarks.accommodation }}</div>
+                          </div>
+                          <div class="mb-4">
+                            <div class="text-subtitle-2 font-weight-bold mb-1 text-grey-darken-2">
+                              <v-icon class="mr-1" color="deep-orange" size="small">mdi-silverware-variant</v-icon> 美食推荐
+                            </div>
+                            <div class="text-body-2 text-grey-darken-1">{{ tripDetail.remarks.food }}</div>
+                          </div>
+                        </v-col>
+
+                        <v-divider class="my-2" />
+
+                        <!-- 避坑提示 (Tips) -->
+                        <v-col cols="12">
+                          <div class="text-subtitle-2 font-weight-bold mb-2 text-grey-darken-2">
+                            <v-icon class="mr-1" color="error" size="small">mdi-alert-circle-outline</v-icon> 避坑与注意事项
+                          </div>
+                          <v-list class="pa-0" density="compact">
+                            <v-list-item
+                              v-for="(tip, idx) in tripDetail.remarks.tips"
+                              :key="'tip-'+idx"
+                              class="px-0 min-h-0"
+                            >
+                              <template #prepend>
+                                <v-icon class="mr-2" color="error" size="x-small">mdi-asterisk</v-icon>
+                              </template>
+                              <v-list-item-title class="text-body-2 text-grey-darken-1" style="white-space: normal;">
+                                {{ tip }}
+                              </v-list-item-title>
+                            </v-list-item>
+                          </v-list>
+                        </v-col>
+
+                        <!-- 行李清单 (Packing) -->
+                        <v-col cols="12">
+                          <div class="text-subtitle-2 font-weight-bold mb-2 text-grey-darken-2">
+                            <v-icon class="mr-1" color="teal" size="small">mdi-bag-checked</v-icon> 专属行李清单
+                          </div>
+                          <div class="d-flex flex-wrap gap-2">
+                            <v-chip
+                              v-for="(item, idx) in tripDetail.remarks.packing"
+                              :key="'pack-'+idx"
+                              class="mb-2 mr-2"
+                              color="teal-darken-1"
+                              size="small"
+                              variant="outlined"
+                            >
+                              {{ item }}
+                            </v-chip>
+                          </div>
+                        </v-col>
+                      </v-row>
+                    </v-card-text>
+                  </v-card>
+
+                  <!-- 兼容旧版本的纯文本 Markdown 渲染 (可选) -->
+                  <v-card
+                    v-else-if="tripDetail.remarks && typeof tripDetail.remarks === 'string'"
+                    class="rounded-lg shadow-sm border w-100 mt-4"
+                    elevation="0"
+                  >
+                    <v-card-title class="bg-grey-lighten-4 py-3 text-subtitle-1 font-weight-bold">AI 行程贴士</v-card-title>
+                    <v-card-text class="pa-6" style="white-space: pre-wrap;">{{ tripDetail.remarks }}</v-card-text>
+                  </v-card>
                 </v-row>
               </template>
 
@@ -200,6 +314,74 @@
                         variant="outlined"
                       />
                     </v-col>
+                    <!-- 🌟 新增：AI 行程锦囊编辑区 🌟 -->
+                    <v-col cols="12">
+                      <v-divider class="mb-4" />
+                      <div class="text-subtitle-2 font-weight-bold mb-3 text-primary">修改 AI 行程锦囊</div>
+                    </v-col>
+
+                    <!-- 确保 remarks 存在且是个对象才能编辑 -->
+                    <template v-if="tripDetail.remarks && typeof tripDetail.remarks === 'object'">
+                      <v-col cols="12" md="6">
+                        <v-textarea
+                          v-model="tripDetail.remarks.overview"
+                          auto-grow
+                          density="compact"
+                          label="行程概述"
+                          rows="2"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field v-model="tripDetail.remarks.best_time" density="compact" label="最佳出行时间" variant="outlined" />
+                        <v-text-field v-model="tripDetail.remarks.budget" density="compact" label="预估预算" variant="outlined" />
+                      </v-col>
+                      <v-col cols="12">
+                        <v-textarea
+                          v-model="tripDetail.remarks.accommodation"
+                          auto-grow
+                          density="compact"
+                          label="住宿建议"
+                          rows="2"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12">
+                        <v-textarea
+                          v-model="tripDetail.remarks.food"
+                          auto-grow
+                          density="compact"
+                          label="美食推荐"
+                          rows="2"
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12">
+                        <!-- combobox 支持输入后回车变成 chip 数组 -->
+                        <v-combobox
+                          v-model="tripDetail.remarks.tips"
+                          chips
+                          clearable
+                          closable-chips
+                          density="compact"
+                          label="避坑提示 (输入后回车添加)"
+                          multiple
+                          variant="outlined"
+                        />
+                      </v-col>
+                      <v-col cols="12">
+                        <v-combobox
+                          v-model="tripDetail.remarks.packing"
+                          chips
+                          clearable
+                          closable-chips
+                          density="compact"
+                          label="行李清单 (输入后回车添加)"
+                          multiple
+                          variant="outlined"
+                        />
+                      </v-col>
+                    </template>
 
                     <v-col class="py-2" cols="12">
                       <v-switch
@@ -227,6 +409,7 @@
               </template>
             </v-card-text>
           </v-card>
+
           <div class="mt-4">
             <TripPlanBoard
               :editable="canEdit"
@@ -431,6 +614,26 @@
         }
       },
 
+      // 🌟 新增：删除行程功能 🌟
+      async confirmDeleteTrip () {
+        const isConfirm = window.confirm('确定要永久删除这个行程吗？该操作不可恢复！')
+        if (!isConfirm) return
+
+        try {
+          await axios.delete('/api/trip/delete', {
+            params: { trip_id: this.tripId, user_id: this.userId },
+          })
+
+          this.showSnack('行程已成功删除！', 'success')
+          setTimeout(() => {
+            this.$router.push('/plan')
+          }, 1000)
+        } catch (error) {
+          console.error('删除失败:', error)
+          this.showSnack('删除失败: ' + (error.response?.data?.detail || error.message), 'error')
+        }
+      },
+
       enterEdit () {
         // ✅ 收藏行程不可编辑：不允许进入编辑态
         if (!this.canEdit) {
@@ -445,9 +648,15 @@
         this.editForm.end_date = this.tripDetail.end_date
         this.editForm.is_public = !!this.tripDetail.is_public
         this.editForm.publish_action = 'keep'
+        // ✅ 防报错：如果旧数据 remarks 为空或纯文本，给它初始化一个标准的空字典
+        if (!this.tripDetail.remarks || typeof this.tripDetail.remarks !== 'object') {
+          this.tripDetail.remarks = {
+            overview: '', best_time: '', budget: '', accommodation: '', food: '', packing: [], tips: [],
+          }
+        }
       },
-
-      cancelEdit () {
+      // 🌟 修改：取消编辑时，重新拉取详情以丢弃未保存的修改 🌟
+      async cancelEdit () {
         this.editing = false
       },
 
@@ -564,6 +773,8 @@
             end_date: this.editForm.end_date,
             is_public: this.editForm.is_public ? 1 : 0,
             publish_action: this.editForm.publish_action,
+            // ✅ 透传修改后的 AI 锦囊给后端
+            remarks: this.tripDetail.remarks,
           }
 
           await axios.put('/api/trip/update', payload)

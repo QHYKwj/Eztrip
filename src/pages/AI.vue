@@ -5,31 +5,31 @@
       elevation="0"
       style="background-color: #F3F2FD; border-bottom: 1px solid #DBD1EF"
     >
-      <v-app-bar-nav-icon @click="$router.go(-1)" style="color: #675096" />
+      <v-app-bar-nav-icon style="color: #675096" @click="$router.go(-1)" />
       <v-toolbar-title style="color: #675096; font-weight: 600">
         AI 智能助手
       </v-toolbar-title>
       <v-spacer />
       <v-btn
+        v-tooltip:left="'清空对话'"
         icon
         style="color: #675096"
         @click="clearChat"
-        v-tooltip:left="'清空对话'"
       >
         <v-icon>mdi-trash-can-outline</v-icon>
       </v-btn>
     </v-app-bar>
 
     <!-- 对话历史区 -->
-    <div class="chat-history" ref="chatHistory">
+    <div ref="chatHistory" class="chat-history">
       <!-- 欢迎提示 -->
       <div v-if="chatMessages.length === 0" class="welcome-tip">
         <v-avatar size="64" style="background-color: #742DD8; margin-bottom: 16px">
-          <v-icon size="32" color="white">mdi-robot</v-icon>
+          <v-icon color="white" size="32">mdi-robot</v-icon>
         </v-avatar>
         <h3 style="color: #444; margin-bottom: 8px">你好！我是你的 AI 助手</h3>
         <p style="color: #675096; font-size: 14px">
-          有什么可以帮你的？比如生成行程、解答问题~
+          有什么可以帮你的？开启下方 Agent 模式可以直接为你排版行程哦~
         </p>
       </div>
 
@@ -40,7 +40,7 @@
           :key="index"
           :class="['chat-item', msg.role === 'user' ? 'user-chat' : 'ai-chat']"
         >
-          <v-avatar size="40" class="chat-avatar">
+          <v-avatar class="chat-avatar" size="40">
             <v-icon color="white" size="20">
               {{ msg.role === 'user' ? 'mdi-account-circle' : 'mdi-robot' }}
             </v-icon>
@@ -50,9 +50,34 @@
               class="chat-bubble"
               :style="msg.role === 'user' ? userBubbleStyle : aiBubbleStyle"
             >
+              <!-- 文本消息 -->
               <p :style="{ color: msg.role === 'user' ? 'white' : '#444' }">
                 {{ msg.content }}
               </p>
+
+              <!-- ✅ 核心：如果大模型生成了行程，渲染卡片 ✅ -->
+              <div v-if="msg.trip_id" class="mt-4" style="width: 100%;">
+                <v-divider class="mb-3" color="#DBD1EF" />
+                <div style="color: #2e7d32; font-weight: 600; font-size: 14px; margin-bottom: 12px; display: flex; align-items: center;">
+                  <v-icon class="mr-1" color="success" size="18">mdi-check-circle</v-icon>
+                  行程已自动生成并保存至草稿箱
+                </div>
+
+                <!-- 渲染复用的 TripCard 组件 -->
+                <TripCard class="mb-3" :trip-id="msg.trip_id" />
+
+                <v-btn
+                  block
+                  class="mt-2 text-white"
+                  color="#742DD8"
+                  prepend-icon="mdi-map-search-outline"
+                  variant="flat"
+                  @click="$router.push(`/trip/${msg.trip_id}`)"
+                >
+                  查看并编辑详细路线
+                </v-btn>
+              </div>
+
             </div>
             <p class="chat-time">{{ formatTime(msg.timestamp) }}</p>
           </div>
@@ -60,15 +85,15 @@
 
         <!-- AI 加载中状态 -->
         <div v-if="isLoading" class="chat-item ai-chat">
-          <v-avatar size="40" class="chat-avatar">
+          <v-avatar class="chat-avatar" size="40">
             <v-icon color="white" size="20">mdi-robot</v-icon>
           </v-avatar>
           <div class="chat-content">
             <div class="chat-bubble" :style="aiBubbleStyle">
               <div class="loading-dots">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
+                <span class="dot" />
+                <span class="dot" />
+                <span class="dot" />
               </div>
             </div>
           </div>
@@ -82,23 +107,33 @@
         outlined
         style="border-color: #DBD1EF; background-color: white; width: 100%"
       >
-        <v-card-text>
+        <v-card-text class="pb-1">
+          <!-- ✅ Agent 模式开关 ✅ -->
+          <v-switch
+            v-model="directAddPlan"
+            class="mb-2"
+            color="#742DD8"
+            density="compact"
+            hide-details
+            label="🤖 开启 Agent 模式：直接生成详细行程并存入我的计划"
+          />
+
           <v-textarea
             v-model="inputMessage"
-            placeholder="输入你的问题或需求..."
-            style="resize: none; color: #444; border: 1px solid #DBD1EF; border-radius: 8px; padding: 8px 12px"
-            rows="1"
-            max-rows="4"
-            @keydown.enter.prevent="sendMessage"
             hide-details
+            max-rows="4"
+            placeholder="输入你的问题或需求..."
+            rows="1"
+            style="resize: none; color: #444; border: 1px solid #DBD1EF; border-radius: 8px; padding: 8px 12px"
+            @keydown.enter.exact.prevent="sendMessage"
           />
         </v-card-text>
         <v-card-actions style="justify-content: flex-end; padding: 8px 16px">
           <v-btn
+            :disabled="!inputMessage.trim() || isLoading"
+            rounded
             style="background-color: #742DD8; color: white"
             @click="sendMessage"
-            rounded
-            :disabled="!inputMessage.trim() || isLoading"
           >
             <v-icon left>mdi-paper-plane</v-icon>发送
           </v-btn>
@@ -109,119 +144,176 @@
 </template>
 
 <script>
-import axios from "axios";
+  import TripCard from '@/components/TripCard.vue' // 引入卡片组件
+  import axios from '@/config/axios' // 建议使用你们统一配置好的 axios 实例
 
-export default {
-  name: "AIChatPage",
-  data() {
-    return {
-      chatMessages: [],
-      inputMessage: "",
-      isLoading: false,
-      userBubbleStyle: {
-        backgroundColor: "#742DD8",
-        borderRadius: "16px 16px 4px 16px",
-        padding: "12px 16px",
-        maxWidth: "100%",
-        lineHeight: "1.6",
-        wordBreak: "break-word",
-        whiteSpace: "pre-wrap",
-        boxShadow: "0 1px 4px rgba(0, 0, 0, 0.05)"
+  export default {
+    name: 'AIChatPage',
+    components: {
+      TripCard,
+    },
+    data () {
+      return {
+        chatMessages: [],
+        inputMessage: '',
+        isLoading: false,
+        directAddPlan: false, // 绑定开关的值
+        userId: null, // 当前用户ID
+        userBubbleStyle: {
+          backgroundColor: '#742DD8',
+          borderRadius: '16px 16px 4px 16px',
+          padding: '12px 16px',
+          maxWidth: '100%',
+          lineHeight: '1.6',
+          wordBreak: 'break-word',
+          whiteSpace: 'pre-wrap',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+        },
+        aiBubbleStyle: {
+          backgroundColor: '#F3F2FD',
+          border: '1px solid #DBD1EF',
+          borderRadius: '16px 16px 16px 4px',
+          padding: '12px 16px',
+          maxWidth: '85%', // 稍微加宽一点以适应可能出现的卡片
+          lineHeight: '1.6',
+          wordBreak: 'break-word',
+          whiteSpace: 'pre-wrap',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.05)',
+        },
+      }
+    },
+
+    mounted () {
+      this.initUserAndLoadChat()
+    },
+
+    // ✅ 增加 activated 钩子，防止 App.vue 使用了 <keep-alive> 导致 mounted 不执行
+    activated () {
+      this.initUserAndLoadChat()
+    },
+    methods: {
+      // 🌟 1. 抽离初始化方法
+      initUserAndLoadChat () {
+        // 尝试获取当前登录用户
+        const userInfo = JSON.parse(sessionStorage.getItem('user_info') || '{}')
+        this.userId = userInfo.user_id || userInfo.id || 1
+
+        // 读取缓存
+        this.loadChatHistory()
       },
-      aiBubbleStyle: {
-        backgroundColor: "#F3F2FD",
-        border: "1px solid #DBD1EF",
-        borderRadius: "16px 16px 16px 4px",
-        padding: "12px 16px",
-        maxWidth: "80%",
-        lineHeight: "1.6",
-        wordBreak: "break-word",
-        whiteSpace: "pre-wrap",
-        boxShadow: "0 1px 4px rgba(0, 0, 0, 0.05)"
-      }
-    };
-  },
-  methods: {
-    async sendMessage() {
-      const content = this.inputMessage.trim();
-      if (!content || this.isLoading) return;
 
-      // 1) 先把用户消息放入列表
-      const userMsg = {
-        role: "user",
-        content,
-        timestamp: Date.now()
-      };
-      this.chatMessages.push(userMsg);
-      this.inputMessage = "";
-      this.scrollToBottom();
+      // 🌟 2. 显式保存方法（核心解法）
+      saveChatHistory () {
+        if (this.userId) {
+          sessionStorage.setItem(`eztrip_ai_chat_${this.userId}`, JSON.stringify(this.chatMessages))
+        }
+      },
 
-      // 2) 调用后端
-      this.isLoading = true;
+      // 🌟 3. 加载历史记录
+      loadChatHistory () {
+        const savedChat = sessionStorage.getItem(`eztrip_ai_chat_${this.userId}`)
+        if (savedChat) {
+          try {
+            const parsedChat = JSON.parse(savedChat)
+            // 仅当缓存里真的有数据时才赋值，防止被 [] 覆盖
+            if (parsedChat && parsedChat.length > 0) {
+              this.chatMessages = parsedChat
+              this.scrollToBottom()
+            }
+          } catch (error) {
+            console.error('解析历史聊天记录失败', error)
+          }
+        }
+      },
+      async sendMessage () {
+        const content = this.inputMessage.trim()
+        if (!content || this.isLoading) return
 
-      try {
-        // FastAPI 这里是 Form(...)，所以必须用 FormData 或 x-www-form-urlencoded
-        const formData = new FormData();
-        formData.append("prompt", content);
+        // 1) 先把用户消息放入列表
+        const userMsg = {
+          role: 'user',
+          content,
+          timestamp: Date.now(),
+        }
+        this.chatMessages.push(userMsg)
+        this.saveChatHistory() // ✅ 手动保存
+        this.inputMessage = ''
+        this.scrollToBottom()
 
-        // ✅ 改成你后端地址（同域可写 ""；跨域就写 http://127.0.0.1:8000 之类）
-        const res = await axios.post("/api/model", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          },
-          timeout: 60000
-        });
+        // 2) 调用后端
+        this.isLoading = true
 
-        // 你的后端返回： { "response": "..." }
-        const aiText = res?.data?.response ?? "（模型没有返回内容）";
+        try {
+          // ✅ 改为 JSON 格式发送，匹配后端的 Pydantic 模型
+          const payload = {
+            user_id: this.userId,
+            prompt: content,
+            direct_add_plan: this.directAddPlan,
+          }
 
-        const aiMsg = {
-          role: "ai",
-          content: aiText,
-          timestamp: Date.now()
-        };
-        this.chatMessages.push(aiMsg);
-      } catch (err) {
-        // 3) 错误也给一个气泡提示
-        const msg =
-          err?.response?.data?.detail ||
-          err?.message ||
-          "请求失败：未知错误";
+          const res = await axios.post('/model/agent_plan', payload, {
+            timeout: 120_000,
+          })
+          console.log('✅ 收到后端响应内容:', res)
+          // 新后端返回： { "reply": "...", "trip_id": 123, "structured_data": {...} }
+          const resData = res?.data ?? res
+          console.log(resData)
+          const aiText = resData.reply ?? '（模型没有返回内容）'
+          const tripId = resData.trip_id || null
 
-        this.chatMessages.push({
-          role: "ai",
-          content: `⚠️ 调用失败：${msg}`,
-          timestamp: Date.now()
-        });
-      } finally {
-        this.isLoading = false;
-        this.scrollToBottom();
-      }
+          const aiMsg = {
+            role: 'ai',
+            content: aiText,
+            trip_id: tripId, // 保存 tripId 用于渲染卡片
+            timestamp: Date.now(),
+          }
+          console.log('aiMsg', aiMsg)
+          this.chatMessages.push(aiMsg)
+          this.saveChatHistory() // ✅ 手动保存
+        } catch (error) {
+          console.error('❌ 请求大模型异常:', error)
+          // 3) 错误气泡提示
+          const msg
+            = error?.response?.data?.detail
+              || error?.message
+              || '请求失败：未知错误'
+
+          this.chatMessages.push({
+            role: 'ai',
+            content: `⚠️ 调用失败：${msg}`,
+            timestamp: Date.now(),
+          })
+        } finally {
+          this.isLoading = false
+          this.scrollToBottom()
+        }
+      },
+
+      scrollToBottom () {
+        this.$nextTick(() => {
+          const chatHistory = this.$refs.chatHistory
+          if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight
+        })
+      },
+
+      formatTime (timestamp) {
+        const date = new Date(timestamp)
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+        return `${hours}:${minutes}`
+      },
+
+      clearChat () {
+        // 🌟 3. 清空数组，并同步移除 localStorage 中的缓存
+        this.chatMessages = []
+        this.saveChatHistory() // ✅ 清空也手动触发一次保存（相当于清空 localStorage）
+      },
     },
-
-    scrollToBottom() {
-      this.$nextTick(() => {
-        const chatHistory = this.$refs.chatHistory;
-        if (chatHistory) chatHistory.scrollTop = chatHistory.scrollHeight;
-      });
-    },
-
-    formatTime(timestamp) {
-      const date = new Date(timestamp);
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `${hours}:${minutes}`;
-    },
-
-    clearChat() {
-      this.chatMessages = [];
-    }
   }
-};
 </script>
 
-
 <style scoped>
+/* 保持你原来的样式不变 */
 .ai-chat-container {
   min-height: 100vh;
   display: flex;
@@ -331,7 +423,7 @@ export default {
 
 @media (max-width: 600px) {
   .chat-history { padding: 16px; }
-  .chat-bubble { max-width: 85% !important; }
+  .chat-bubble { max-width: 90% !important; }
   .chat-input-area { padding: 12px 16px; }
   .welcome-tip { padding: 24px 16px; }
 }
