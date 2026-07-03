@@ -1,10 +1,12 @@
 {
-        "mysql": {
-                "host": "localhost",
-                "database": "eztrip",
-                "user": "root",
-                "password": "Wj4QHYK2",
-                "port": 3306,
-                "charset": "utf8mb4"
-        }
+    "mysql": {
+        "host": "localhost",
+        "database": "eztrip",
+        "user": "root",
+        "password": "数据库密码",
+        "port": 3306,
+        "charset": "utf8mb4"
+    },
+    "DEEPSEEK_API_KEY": "你的apikey",
+    "DEEPSEEK_BASE_URL": "https://api.deepseek.com"
 }
