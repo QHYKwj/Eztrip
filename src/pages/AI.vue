@@ -64,7 +64,12 @@
                 </div>
 
                 <!-- 渲染复用的 TripCard 组件 -->
-                <TripCard class="mb-3" :trip-id="msg.trip_id" />
+                <TripCard
+                  :ai-trip-id="msg.trip_id"
+                  :ai-title="msg.structured_data?.trip_title"
+                  :ai-destination="msg.structured_data?.destination"
+                  :ai-days="msg.structured_data?.total_days"
+                />
 
                 <v-btn
                   block
@@ -194,13 +199,25 @@
     methods: {
       // 🌟 1. 抽离初始化方法
       initUserAndLoadChat () {
-        // 尝试获取当前登录用户
-        const userInfo = JSON.parse(sessionStorage.getItem('user_info') || '{}')
-        this.userId = userInfo.user_id || userInfo.id || 1
+        console.log('=== 开始读取用户信息 ===')
+        // 1. 取出存储字符串
+        const userRaw = sessionStorage.getItem('user')
+        console.log('sessionStorage["user"] 原始字符串：', userRaw)
 
-        // 读取缓存
+        // 2. 解析JSON
+        let userInfo = {}
+        if (userRaw) {
+          userInfo = JSON.parse(userRaw)
+        }
+        console.log('解析后的 userInfo 对象：', userInfo)
+
+        // 3. 提取 user_id
+        this.userId = userInfo.user_id ?? null
+        console.log('赋值后的 this.userId =', this.userId)
+
         this.loadChatHistory()
       },
+
 
       // 🌟 2. 显式保存方法（核心解法）
       saveChatHistory () {
@@ -229,6 +246,12 @@
         const content = this.inputMessage.trim()
         if (!content || this.isLoading) return
 
+        // ========== 新增：Agent模式下校验用户ID，避免行程归属错误 ==========
+        if (this.directAddPlan && !this.userId) {
+          alert('请先登录后再生成并保存行程')
+          return
+        }
+
         // 1) 先把用户消息放入列表
         const userMsg = {
           role: 'user',
@@ -236,7 +259,7 @@
           timestamp: Date.now(),
         }
         this.chatMessages.push(userMsg)
-        this.saveChatHistory() // ✅ 手动保存
+        this.saveChatHistory()
         this.inputMessage = ''
         this.scrollToBottom()
 
@@ -244,7 +267,6 @@
         this.isLoading = true
 
         try {
-          // ✅ 改为 JSON 格式发送，匹配后端的 Pydantic 模型
           const payload = {
             user_id: this.userId,
             prompt: content,
@@ -255,7 +277,7 @@
             timeout: 120_000,
           })
           console.log('✅ 收到后端响应内容:', res)
-          // 新后端返回： { "reply": "...", "trip_id": 123, "structured_data": {...} }
+
           const resData = res?.data ?? res
           console.log(resData)
           const aiText = resData.reply ?? '（模型没有返回内容）'
@@ -264,15 +286,16 @@
           const aiMsg = {
             role: 'ai',
             content: aiText,
-            trip_id: tripId, // 保存 tripId 用于渲染卡片
+            trip_id: tripId,
+            // ========== 新增：保存结构化行程数据，供卡片直接展示 ==========
+            structured_data: resData.structured_data || {},
             timestamp: Date.now(),
           }
           console.log('aiMsg', aiMsg)
           this.chatMessages.push(aiMsg)
-          this.saveChatHistory() // ✅ 手动保存
+          this.saveChatHistory()
         } catch (error) {
           console.error('❌ 请求大模型异常:', error)
-          // 3) 错误气泡提示
           const msg
             = error?.response?.data?.detail
               || error?.message
