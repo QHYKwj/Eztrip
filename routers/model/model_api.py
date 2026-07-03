@@ -5,43 +5,57 @@ from openai import OpenAI
 from datetime import date, timedelta
 import os
 import json
-from datetime import date, timedelta
-
+from pathlib import Path
 # 引入你的数据库连接
 from config.connect_db import connect_db
+
+# ====================== 新增：读取本地配置文件 ======================
+def load_config():
+    """加载根目录settings.json配置，环境变量优先级更高"""
+    config_path = Path("./setting.json")
+    config = {}
+    # 先读取本地json配置
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    # 环境变量 > 配置文件，服务器部署用环境变量
+    api_key = os.getenv("DEEPSEEK_API_KEY", config.get("DEEPSEEK_API_KEY", ""))
+    base_url = os.getenv("DEEPSEEK_BASE_URL", config.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+    return api_key, base_url
+
+# 加载密钥与接口地址
+DEEPSEEK_KEY, DEEPSEEK_URL = load_config()
+# =================================================================
 
 router = APIRouter(prefix="/api/model", tags=["model"])
 
 # ==========================================
-# 0. 初始化 OpenAI 客户端 (适配最新 DeepSeek 官方 API)
+# 0. 初始化 OpenAI 客户端 (不再硬编码key)
 # ==========================================
-# 强烈建议将 API KEY 放在环境变量或配置字典中
 client = OpenAI(
-    api_key=os.environ.get('DEEPSEEK_API_KEY', "sk-3ec2308955134a51b7e6c2ae50bec60c"), # 替换为你的真实 Key
-    base_url="https://api.deepseek.com"
+    api_key=DEEPSEEK_KEY,
+    base_url=DEEPSEEK_URL
 )
 
-# ==========================================
+# 下方所有原有代码完全不动，只改上面客户端初始化部分
 # 1. 定义请求和响应的数据模型 (Pydantic)
-# ==========================================
 class ChatRequest(BaseModel):
     prompt: str
-
 class AgentPlanRequest(BaseModel):
     user_id: int
     prompt: str
     direct_add_plan: bool = False
-
 # ==========================================
 # 2. 基础对话接口
-# ==========================================
 @router.post("")
 async def chat_with_model(request: ChatRequest):
     """普通非流式对话"""
     try:
         if not request.prompt.strip():
             raise HTTPException(status_code=400, detail="提示词不能为空")
-
+        # 校验密钥是否配置
+        if not DEEPSEEK_KEY:
+            raise HTTPException(status_code=500, detail="未配置DeepSeek API密钥，请检查settings.json")
         completion = client.chat.completions.create(
             model="deepseek-v4-pro",
             messages=[{"role": "user", "content": request.prompt}],
@@ -54,17 +68,16 @@ async def chat_with_model(request: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"大模型调用失败: {str(e)}")
 
-
 def sse_pack(data: dict) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-
 
 @router.post("/stream")
 async def chat_with_model_stream(request: ChatRequest):
     """流式对话接口（SSE）"""
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="提示词不能为空")
-
+    if not DEEPSEEK_KEY:
+        raise HTTPException(status_code=500, detail="未配置DeepSeek API密钥，请检查settings.json")
     def gen():
         try:
             stream = client.chat.completions.create(
@@ -76,18 +89,15 @@ async def chat_with_model_stream(request: ChatRequest):
             yield sse_pack({"type": "start"})
             for event in stream:
                 delta = event.choices[0].delta
-
                 # 如果你想把思考过程也推给前端，可以检测 reasoning_content
                 # if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 #     yield sse_pack({"type": "thinking", "content": delta.reasoning_content})
-
                 # 推送正式内容
                 if getattr(delta, "content", None):
                     yield sse_pack({"type": "delta", "content": delta.content})
             yield sse_pack({"type": "done"})
         except Exception as e:
             yield sse_pack({"type": "error", "message": str(e)})
-
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 # ==========================================
@@ -95,7 +105,6 @@ async def chat_with_model_stream(request: ChatRequest):
 # ==========================================
 AGENT_SYSTEM_PROMPT = """
 你是一个专业的旅游行程规划Agent。你需要根据用户的需求生成一份详细行程，必须以严格的JSON格式返回，不要包含任何Markdown标记。
-
 必须包含的JSON字段：
 {
   "reply_text": "亲切的回复话语...",
@@ -121,15 +130,13 @@ AGENT_SYSTEM_PROMPT = """
   ]
 }
 """
-
 def safe_json_load(s: str):
     """
-    即使大模型输出了带有 markdown 甚至 <think> 标签的内容，
+    即使大模型输出了带有 markdown 甚至  标签的内容，
     这个函数也能尝试精准截取并解析最外层的 JSON 结构。
     """
     if not s:
         raise ValueError("模型返回为空")
-
     # 尝试直接解析
     s = s.strip()
     try:
@@ -137,7 +144,6 @@ def safe_json_load(s: str):
             return json.loads(s)
     except json.JSONDecodeError:
         pass
-
     # 截取第一个 '{' 到最后一个 '}'
     l = s.find("{")
     r = s.rfind("}")
@@ -146,7 +152,6 @@ def safe_json_load(s: str):
             return json.loads(s[l:r+1])
         except json.JSONDecodeError as e:
             raise ValueError(f"截取JSON后解析仍失败: {str(e)}")
-
     raise ValueError("模型输出未包含有效JSON格式")
 
 @router.post("/agent_plan")
@@ -157,7 +162,8 @@ async def generate_and_save_plan(request: AgentPlanRequest):
     """
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="提示词不能为空")
-
+    if not DEEPSEEK_KEY:
+        raise HTTPException(status_code=500, detail="未配置DeepSeek API密钥，请检查settings.json")
     try:
         # 1. 仅聊天模式
         if not request.direct_add_plan:
@@ -172,7 +178,6 @@ async def generate_and_save_plan(request: AgentPlanRequest):
                 "reply": completion.choices[0].message.content,
                 "trip_id": None
             }
-
         # 2. Agent 工作模式：强制系统提示词输出 JSON
         completion = client.chat.completions.create(
             model="deepseek-v4-pro",
@@ -186,24 +191,19 @@ async def generate_and_save_plan(request: AgentPlanRequest):
             # 如果 DeepSeek API 报错不支持 response_format="json_object"，可以注释掉下一行
             # response_format={"type": "json_object"}
         )
-
         content = completion.choices[0].message.content
         ai_data = safe_json_load(content)
-
         # 3. 开启数据库事务，进行插入操作
         db_conn = connect_db()
         if not db_conn:
             raise HTTPException(status_code=500, detail="数据库连接失败")
-
         cursor = db_conn.cursor()
         trip_id = None
-
         try:
             # 默认从今天开始排期
             start_date = date.today()
             total_days = ai_data.get("total_days", 1)
             end_date = start_date + timedelta(days=total_days - 1)
-
             # 🌟 核心修改：将 AI 生成的锦囊数据打包成标准字典
             remarks_dict = {
                 "overview": ai_data.get("overview", "一场说走就走的旅行"),
@@ -216,8 +216,7 @@ async def generate_and_save_plan(request: AgentPlanRequest):
             }
             # 转为 JSON 字符串准备存入数据库
             remarks_json = json.dumps(remarks_dict, ensure_ascii=False)
-
-            # 插入 trip 表 (默认设为草稿状态 draft)
+            # 插入 trip 表 (默认设为草稿状态)
             insert_trip_sql = """
                 INSERT INTO trip (owner_user_id, title, destination, start_date, end_date, publish_status, is_public, remarks)
                 VALUES (%s, %s, %s, %s, %s, 'draft', 0, %s)
@@ -228,10 +227,9 @@ async def generate_and_save_plan(request: AgentPlanRequest):
                 ai_data.get("destination", "未知目的地"),
                 start_date,
                 end_date,
-                remarks_json  # <--- 存入 JSON 格式的 remarks
+                remarks_json
             ))
             trip_id = cursor.lastrowid
-
             # 遍历插入每日计划 trip_day_plan
             for day in ai_data.get("days", []):
                 insert_day_sql = """
@@ -244,7 +242,6 @@ async def generate_and_save_plan(request: AgentPlanRequest):
                     day.get("note", "")
                 ))
                 day_plan_id = cursor.lastrowid
-
                 # 遍历插入每日具体项目 trip_day_item
                 sort_order = 1
                 for item in day.get("items", []):
@@ -259,24 +256,19 @@ async def generate_and_save_plan(request: AgentPlanRequest):
                         sort_order
                     ))
                     sort_order += 1
-
             db_conn.commit()
-
         except Exception as db_e:
             db_conn.rollback()
             raise ValueError(f"数据库写入失败: {str(db_e)}")
         finally:
             cursor.close()
             db_conn.close()
-
         # 4. 成功返回
         return {
             "reply": ai_data.get("reply_text", "已经为您规划好行程并保存至草稿箱。"),
             "trip_id": trip_id,
-            # 将生成的结构化数据带回去给前端，方便调试或做即时渲染的 fallback
             "structured_data": ai_data
         }
-
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
