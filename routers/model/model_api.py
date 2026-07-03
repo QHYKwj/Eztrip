@@ -11,16 +11,21 @@ from config.connect_db import connect_db
 
 # ====================== 新增：读取本地配置文件 ======================
 def load_config():
-    """加载根目录settings.json配置，环境变量优先级更高"""
+    """加载根目录settings.json配置，并自动清洗特殊/全角字符"""
     config_path = Path("./setting.json")
     config = {}
-    # 先读取本地json配置
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-    # 环境变量 > 配置文件，服务器部署用环境变量
-    api_key = os.getenv("DEEPSEEK_API_KEY", config.get("DEEPSEEK_API_KEY", ""))
-    base_url = os.getenv("DEEPSEEK_BASE_URL", config.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+
+    # 优先读取环境变量，其次是配置文件
+    raw_key = os.getenv("DEEPSEEK_API_KEY", config.get("DEEPSEEK_API_KEY", ""))
+    raw_url = os.getenv("DEEPSEEK_BASE_URL", config.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
+
+    # 🌟 核心清洗：去除前后空格、去除全角引号、替换非法字符
+    api_key = str(raw_key).strip().replace("“", "").replace("”", "").replace("'", "")
+    base_url = str(raw_url).strip().replace("“", "").replace("”", "")
+
     return api_key, base_url
 
 # 加载密钥与接口地址

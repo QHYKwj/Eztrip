@@ -3,10 +3,10 @@
         "host": "localhost",
         "database": "eztrip",
         "user": "root",
-        "password": "数据库密码",
+        "password": "Wj4QHYK2",
         "port": 3306,
         "charset": "utf8mb4"
     },
-    "DEEPSEEK_API_KEY": "你的apikey",
+    "DEEPSEEK_API_KEY": "sk-3ec2308955134a51b7e6c2ae50bec60c",
     "DEEPSEEK_BASE_URL": "https://api.deepseek.com"
 }
