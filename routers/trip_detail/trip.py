@@ -96,6 +96,7 @@ async def trip_detail(
                 t.is_public,
                 t.class,
                 t.remarks,
+                t.is_ai,
 
                 tf.user_id AS fav_user_id,
                 IF(tf.user_id IS NULL, 0, 1) AS is_collected
@@ -144,6 +145,7 @@ async def trip_detail(
             "publish_status": trip["publish_status"],
             "review_comment": trip.get("review_comment"),
             "is_public": int(trip["is_public"]) == 1,
+            "is_ai": int(trip["is_ai"]) if trip.get("is_ai") is not None else 0, # ✅ 返回 is_ai 字段
 
             "is_collected": bool(trip["is_collected"]),
             "is_owner": owner_id == uid,        # ✅ owner 才能编辑

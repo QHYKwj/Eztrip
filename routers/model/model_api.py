@@ -223,8 +223,8 @@ async def generate_and_save_plan(request: AgentPlanRequest):
             remarks_json = json.dumps(remarks_dict, ensure_ascii=False)
             # 插入 trip 表 (默认设为草稿状态)
             insert_trip_sql = """
-                INSERT INTO trip (owner_user_id, title, destination, start_date, end_date, publish_status, is_public, remarks)
-                VALUES (%s, %s, %s, %s, %s, 'draft', 0, %s)
+                INSERT INTO trip (owner_user_id, title, destination, start_date, end_date,is_ai, publish_status, is_public, remarks)
+                VALUES (%s, %s, %s, %s, %s, 1,'draft', 0, %s)
             """
             cursor.execute(insert_trip_sql, (
                 request.user_id,
