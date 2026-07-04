@@ -8,6 +8,17 @@
           </h2>
 
           <v-chip
+            v-if="tripDetail?.is_ai === 1"
+            class="ai-badge font-weight-bold mr-1 ml-3"
+            color="purple-darken-2"
+            prepend-icon="mdi-robot-excited"
+            size="small"
+            variant="elevated"
+          >
+            AI 智能生成
+          </v-chip>
+
+          <v-chip
             class="ml-3"
             :color="statusColor"
             size="small"
@@ -439,6 +450,7 @@
                 :markers="tagMarkers"
                 :pickable="true"
                 :zoom="14"
+                @map-right-click="handleMapRightClick"
                 @pick="handleMapPick"
               />
 
@@ -447,6 +459,61 @@
         </v-col>
       </v-row>
     </div>
+
+    <v-dialog v-model="mapAddDialog.show" max-width="440">
+      <v-card class="rounded-lg pa-2">
+        <v-card-title class="d-flex align-center font-weight-bold text-subtitle-1 pt-3">
+          <v-icon class="mr-2" color="primary">mdi-map-marker-plus</v-icon>
+          添加到具体行程路线
+        </v-card-title>
+
+        <v-card-text class="py-3">
+          <div class="text-caption text-grey-darken-1 mb-4">
+            已拾取经纬度: {{ mapAddDialog.lng?.toFixed(5) }}, {{ mapAddDialog.lat?.toFixed(5) }}
+          </div>
+
+          <v-text-field
+            v-model="mapAddDialog.title"
+            autofocus
+            density="comfortable"
+            label="打卡点名称 / 景点名"
+            placeholder="例如：珠江夜游码头"
+            variant="outlined"
+          />
+
+          <v-select
+            v-model="mapAddDialog.dayIndex"
+            density="comfortable"
+            item-title="text"
+            item-value="value"
+            :items="dayOptions"
+            label="选择加入到第几天"
+            variant="outlined"
+          />
+
+          <v-select
+            v-model="mapAddDialog.placeType"
+            density="comfortable"
+            :items="['景点', '餐饮', '住宿', '购物', '交通', '休闲']"
+            label="分类标签"
+            variant="outlined"
+          />
+        </v-card-text>
+
+        <v-card-actions class="px-4 pb-3 justify-end">
+          <v-btn color="grey" variant="text" @click="mapAddDialog.show = false">取消</v-btn>
+          <v-btn
+            color="primary"
+            :disabled="!mapAddDialog.title.trim() || !mapAddDialog.dayIndex"
+            :loading="mapAddDialog.loading"
+            variant="elevated"
+            @click="submitMapAddTag"
+          >
+            确认加入
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- 保存结果提示 -->
     <v-snackbar v-model="snack.show" :color="snack.color" timeout="2200">
@@ -517,6 +584,16 @@
           date: v => /^\d{4}-\d{2}-\d{2}$/.test(v) || '日期格式应为 YYYY-MM-DD',
           dateOrder: () => true,
         },
+        // 🌟 新增：地图添加点位弹窗状态
+        mapAddDialog: {
+          show: false,
+          lng: null,
+          lat: null,
+          title: '',
+          dayIndex: 1,
+          placeType: '景点',
+          loading: false,
+        },
       }
     },
 
@@ -558,6 +635,17 @@
         if (this.tripDetail.publish_status !== 'published') return `未发布（${this.statusText}）`
         return '-'
       },
+      // 🌟 根据开始和结束日期计算一共有多少天选项
+      dayOptions () {
+        if (!this.tripDetail?.start_date || !this.tripDetail?.end_date) return [{ text: '第 1 天', value: 1 }]
+        const start = new Date(this.tripDetail.start_date)
+        const end = new Date(this.tripDetail.end_date)
+        const days = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1)
+        return Array.from({ length: days }, (_, i) => ({
+          text: `第 ${i + 1} 天`,
+          value: i + 1,
+        }))
+      },
     },
 
     watch: {
@@ -593,6 +681,53 @@
     },
 
     methods: {
+      // 🌟 处理地图右键点击
+      handleMapRightClick ({ lng, lat }) {
+        // 如果是收藏的他人行程（不可编辑），给出提示后直接拦截
+        if (!this.canEdit) {
+          this.showSnack('收藏的行程为只读，不可在地图上添加路线', 'warning')
+          return
+        }
+
+        this.mapAddDialog.lng = Number(lng)
+        this.mapAddDialog.lat = Number(lat)
+        this.mapAddDialog.title = ''
+        this.mapAddDialog.dayIndex = 1
+        this.mapAddDialog.placeType = '景点'
+        this.mapAddDialog.show = true
+      },
+
+      // 🌟 提交将右键点位加入路线
+      async submitMapAddTag () {
+        if (!this.mapAddDialog.title.trim()) return
+
+        this.mapAddDialog.loading = true
+        try {
+          const payload = {
+            user_id: Number(this.userId),
+            trip_id: Number(this.tripId),
+            day_index: Number(this.mapAddDialog.dayIndex),
+            title: this.mapAddDialog.title.trim(),
+            place_type: this.mapAddDialog.placeType,
+            lng: this.mapAddDialog.lng, // 传入精准经纬度
+            lat: this.mapAddDialog.lat,
+          }
+
+          await axios.post('/api/trip_plan/item/add', payload)
+
+          this.showSnack(`🎉 已成功加入第 ${payload.day_index} 天行程！`, 'success')
+          this.mapAddDialog.show = false
+
+          // 重新拉取地图标注列表，地图立刻画出最新折线
+          await this.fetchPlanMarkers()
+        } catch (error) {
+          console.error('地图添加点位失败:', error)
+          this.showSnack(error?.response?.data?.detail || '添加失败，请重新试一次', 'error')
+        } finally {
+          this.mapAddDialog.loading = false
+        }
+      },
+
       handleMapPick (p) {
         // p = {lng, lat, name?}
         // 你可以：弹窗问“要不要把这个点作为一个tag加入第X天”
@@ -679,35 +814,18 @@
         this.loading = true
         this.error = null
         this.tripDetail = null
-        this.mapUrl = ''
         this.favoriteCount = 0
 
         try {
-          // ✅ 正确：使用 query 参数
           const res = await axios.get('/api/trip/detail', {
-            params: {
-              user_id: this.userId,
-              trip_id: this.tripId,
-            },
+            params: { user_id: this.userId, trip_id: this.tripId },
           })
 
-          // 后端已经是“扁平结构”，不需要 res.data.data
           this.tripDetail = res.data
-          // ✅ 初始化收藏状态：优先用详情接口 is_collected
           this.favorited = !!this.tripDetail?.is_collected
 
-          // ✅ 兜底：如果已加载过收藏集合，也用集合再确认一次（防字段不一致）
-          if (this.favoriteIdsLoaded && this.userId) {
-            const tid = Number(this.tripId)
-            if (this.favoriteIds.has(tid)) this.favorited = true
-          }
+          if (this.favoriteIdsLoaded && this.userId && this.favoriteIds.has(Number(this.tripId))) this.favorited = true
 
-          // 地图
-          if (this.tripDetail.lng && this.tripDetail.lat) {
-            await this.fetchMapUrl(this.tripDetail.lng, this.tripDetail.lat)
-          }
-
-          // 收藏人数
           if (this.showFavoriteCount) {
             await this.fetchFavoriteCount()
           }
@@ -715,22 +833,17 @@
           console.error(error)
           this.error = '获取行程详情失败'
         } finally {
+          // 🌟 1. 首先尽快将 loading 设为 false，让页面的主体文字和左侧信息秒开！
           this.loading = false
           this.editing = false
         }
-      },
 
-      async fetchMapUrl (lng, lat) {
-        this.mapLoading = true
-        try {
-          const res = await axios.get('/api/trip/map/url', {
-            params: { lng, lat, zoom: 14, width: 600, height: 300 },
-          })
-          this.mapUrl = res.data.url
-        } catch (error) {
-          console.error('获取地图失败', error)
-        } finally {
-          this.mapLoading = false
+        // 🌟 2. 页面已经展示后，在后台异步拉取地图标记点（就算点很多，也不卡页面文字加载）
+        if (this.tripDetail) {
+          this.fetchPlanMarkers()
+          if (this.tripDetail.lng && this.tripDetail.lat) {
+            this.fetchMapUrl(this.tripDetail.lng, this.tripDetail.lat)
+          }
         }
       },
 
@@ -1076,6 +1189,42 @@
         this.fireworks.show = false
       },
 
+      // 在 trip.vue 的 methods 中新增此方法：
+      async fetchPlanMarkers () {
+        try {
+          const res = await axios.get('/api/trip_plan/get', {
+            params: { user_id: this.userId || 1, trip_id: this.tripId },
+          })
+          const planData = res.data
+          const markersList = []
+
+          if (planData && Array.isArray(planData.days)) {
+            for (const day of planData.days) {
+              if (Array.isArray(day.items)) {
+                for (const [index, item] of day.items.entries()) {
+                  // 确保有合法的坐标值
+                  if (item.lng && item.lat) {
+                    markersList.push({
+                      id: item.id,
+                      name: item.title,
+                      lng: Number(item.lng),
+                      lat: Number(item.lat),
+                      day: day.day_index, // 第几天
+                      seq: index + 1, // 当天第几个打卡点
+                      place_type: item.place_type,
+                    })
+                  }
+                }
+              }
+            }
+          }
+          // 赋值给绑定的数组传给地图
+          this.tagMarkers = markersList
+        } catch (error) {
+          console.error('获取行程地图标记失败:', error)
+        }
+      },
+
     },
   }
 </script>
@@ -1122,4 +1271,23 @@
   display: block;
 }
 
+/* AI 专属芯片微渐变发光效果 */
+.ai-badge {
+  background: linear-gradient(135deg, #7b1fa2 0%, #ba68c8 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(156, 39, 176, 0.35);
+  animation: ai-pulse 2.5s infinite;
+}
+
+@keyframes ai-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(186, 104, 200, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(186, 104, 200, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(186, 104, 200, 0);
+  }
+}
 </style>

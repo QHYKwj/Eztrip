@@ -65,10 +65,10 @@
 
                 <!-- 渲染复用的 TripCard 组件 -->
                 <TripCard
-                  :ai-trip-id="msg.trip_id"
-                  :ai-title="msg.structured_data?.trip_title"
-                  :ai-destination="msg.structured_data?.destination"
                   :ai-days="msg.structured_data?.total_days"
+                  :ai-destination="msg.structured_data?.destination"
+                  :ai-title="msg.structured_data?.trip_title"
+                  :ai-trip-id="msg.trip_id"
                 />
 
                 <v-btn
@@ -151,6 +151,8 @@
 <script>
   import TripCard from '@/components/TripCard.vue' // 引入卡片组件
   import axios from '@/config/axios' // 建议使用你们统一配置好的 axios 实例
+  // 🌟 新增：导入全局行程更新事件仓库
+  import { useTripEventStore } from '@/stores/tripEvent'
 
   export default {
     name: 'AIChatPage',
@@ -218,7 +220,6 @@
         this.loadChatHistory()
       },
 
-
       // 🌟 2. 显式保存方法（核心解法）
       saveChatHistory () {
         if (this.userId) {
@@ -282,7 +283,11 @@
           console.log(resData)
           const aiText = resData.reply ?? '（模型没有返回内容）'
           const tripId = resData.trip_id || null
-
+          // 🌟 核心修改：如果本次 AI 成功生成并存入了数据库，立刻派发全局更新事件！
+          if (tripId) {
+            const tripStore = useTripEventStore()
+            tripStore.triggerRefresh()
+          }
           const aiMsg = {
             role: 'ai',
             content: aiText,

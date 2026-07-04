@@ -74,6 +74,8 @@
 <script>
 import axios from 'axios'
 import { notificationState } from '@/stores/notificationState'
+// 🌟 1. 引入行程事件仓库
+import { useTripEventStore } from '@/stores/tripEvent'
 import NavLink from './NavLink.vue'
 import NavTitle from './NavTitle.vue'
 
@@ -95,6 +97,8 @@ export default {
       localdrawer: this.drawer,
       mini: true,
       notificationState,
+      // 🌟🌟🌟 2. 关键修复：必须在这里实例化 Pinia Store！漏掉这行就会报 undefined 导致白屏 🌟🌟🌟
+      tripEventStore: useTripEventStore(),
       defaultAvatar: 'https://randomuser.me/api/portraits/men/85.jpg',
       user: {
         username: '',
@@ -106,10 +110,20 @@ export default {
     hasUnread () {
       return this.notificationState.unreadCount > 0
     },
+    // 🌟 3. 现在这里安全了，能正确读取 store 中的值
+    tripRefreshTrigger () {
+      return this.tripEventStore?.refreshTrigger || 0
+    },
   },
   watch: {
     drawer (newVal) {
       this.localdrawer = newVal
+    },
+    // 🌟 4. 监听触发器变化：一旦有行程生成/修改，立刻触发回调
+    tripRefreshTrigger () {
+      console.log('⚡ 捕捉到行程更新通知，开始无刷新同步数据...')
+      // 重新拉取用户信息或其他菜单相关的统计数据
+      this.loadUserInfo()
     },
   },
   created () {
@@ -134,7 +148,6 @@ export default {
     async loadUserInfo () {
       const stored = this.getUserFromSession()
       if (!stored || !stored.user_id) {
-        // 未登录：保持默认头像 & 名字
         return
       }
       try {
@@ -142,8 +155,8 @@ export default {
         const data = res.data
         this.user.username = data.username
         this.user.avatar = data.avatar
-      } catch (e) {
-        console.error('加载用户信息失败', e)
+      } catch (error) {
+        console.error('加载用户信息失败', error)
       }
     },
   },
