@@ -1,6 +1,6 @@
 <template>
   <div class="map-wrap">
-    <div ref="container" class="map-container" />
+    <div ref="container" class="map-container" @contextmenu.prevent />
 
     <div class="map-header-tools">
       <div v-if="enableSearch" class="map-search">
@@ -23,161 +23,165 @@
 </template>
 
 <script>
-import AMapLoader from '@amap/amap-jsapi-loader'
+  import AMapLoader from '@amap/amap-jsapi-loader'
 
-export default {
-  name: 'TripMapInteractive',
-  props: {
-    lng: { type: Number, default: 113.2644 },
-    lat: { type: Number, default: 23.1291 },
-    zoom: { type: Number, default: 12 },
-    pickable: { type: Boolean, default: false }, // 详情页展示默认关闭手动打点
-    enableSearch: { type: Boolean, default: true },
-    markers: { type: Array, default: () => [] },
-  },
-  emits: ['update:center', 'pick', 'marker-moved', 'map-right-click'],
-  data () {
-    return {
-      AMap: null,
-      map: null,
-      mainMarker: null,
-      keyword: '',
-      placeSearch: null,
-      renderedMarkers: [],
-      renderedLines: [],
-      // 多天行程专属配色方案
-      dayColors: [
-        '#2196F3', // D1 蓝色
-        '#9C27B0', // D2 紫色
-        '#FF9800', // D3 橙色
-        '#4CAF50', // D4 绿色
-        '#F44336', // D5 红色
-        '#00BCD4', // D6 青色
-        '#E91E63', // D7 粉色
-      ],
-    }
-  },
-  computed: {
-    activeDays () {
-      const days = new Set(this.markers.map(m => m.day || 1))
-      return Array.from(days).sort((a, b) => a - b)
+  export default {
+    name: 'TripMapInteractive',
+    props: {
+      lng: { type: Number, default: 113.2644 },
+      lat: { type: Number, default: 23.1291 },
+      zoom: { type: Number, default: 12 },
+      pickable: { type: Boolean, default: false }, // 详情页展示默认关闭手动打点
+      enableSearch: { type: Boolean, default: true },
+      markers: { type: Array, default: () => [] },
     },
-  },
-  watch: {
-    markers: {
-      deep: true,
-      handler () {
-        this.renderMarkersAndRoutes()
+    emits: ['update:center', 'pick', 'marker-moved', 'map-right-click'],
+    data () {
+      return {
+        AMap: null,
+        map: null,
+        mainMarker: null,
+        keyword: '',
+        placeSearch: null,
+        renderedMarkers: [],
+        renderedLines: [],
+        // 多天行程专属配色方案
+        dayColors: [
+          '#2196F3', // D1 蓝色
+          '#9C27B0', // D2 紫色
+          '#FF9800', // D3 橙色
+          '#4CAF50', // D4 绿色
+          '#F44336', // D5 红色
+          '#00BCD4', // D6 青色
+          '#E91E63', // D7 粉色
+        ],
+      }
+    },
+    computed: {
+      activeDays () {
+        const days = new Set(this.markers.map(m => m.day || 1))
+        return Array.from(days).sort((a, b) => a - b)
       },
     },
-  },
-  async mounted () {
-    await this.initMap()
-  },
-  beforeUnmount () {
-    if (this.map) this.map.destroy()
-  },
-  methods: {
-    getDayColor (dayIndex = 1) {
-      const idx = (dayIndex - 1) % this.dayColors.length
-      return this.dayColors[idx] || '#742DD8'
+    watch: {
+      markers: {
+        deep: true,
+        handler () {
+          this.renderMarkersAndRoutes()
+        },
+      },
     },
+    async mounted () {
+      await this.initMap()
+    },
+    beforeUnmount () {
+      if (this.map) this.map.destroy()
+    },
+    methods: {
+      getDayColor (dayIndex = 1) {
+        const idx = (dayIndex - 1) % this.dayColors.length
+        return this.dayColors[idx] || '#742DD8'
+      },
 
-    async initMap () {
-      window._AMapSecurityConfig = { securityJsCode: '3d64bb5617949c03d8e7dac21479d2da' }
+      async initMap () {
+        window._AMapSecurityConfig = { securityJsCode: '3d64bb5617949c03d8e7dac21479d2da' }
 
-      this.AMap = await AMapLoader.load({
-        key: 'd185585a4be1f46dc467ccb305c00357',
-        version: '2.0',
-        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.PlaceSearch'],
-      })
-
-      this.map = new this.AMap.Map(this.$refs.container, {
-        viewMode: '2D',
-        zoom: this.zoom,
-        center: [this.lng, this.lat],
-        resizeEnable: true,
-      })
-
-      this.map.addControl(new this.AMap.ToolBar())
-      this.map.addControl(new this.AMap.Scale())
-
-// 🌟 新增：监听地图鼠标右键点击（或者使用 'dblclick' 双击事件）
-      this.map.on('rightclick', (e) => {
-        const p = e.lnglat
-        console.log('📍 地图右键拾取坐标:', p.lng, p.lat)
-        this.$emit('map-right-click', { lng: p.lng, lat: p.lat })
-      })
-
-      // 如果允许用户单独点击选点（在编辑或新建模式时）
-      if (this.pickable) {
-        this.mainMarker = new this.AMap.Marker({
-          position: [this.lng, this.lat],
-          draggable: true,
+        this.AMap = await AMapLoader.load({
+          key: 'd185585a4be1f46dc467ccb305c00357',
+          version: '2.0',
+          plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.PlaceSearch'],
         })
-        this.map.add(this.mainMarker)
 
-        this.map.on('click', e => {
+        this.map = new this.AMap.Map(this.$refs.container, {
+          viewMode: '2D',
+          zoom: this.zoom,
+          center: [this.lng, this.lat],
+          resizeEnable: true,
+          doubleClickZoom: false,
+        })
+
+        this.map.addControl(new this.AMap.ToolBar())
+        this.map.addControl(new this.AMap.Scale())
+
+        // 🌟 封装拾取坐标函数，同时支持鼠标右键(rightclick)和双击左键(dblclick)
+        const handleMapClickPick = (e) => {
           const p = e.lnglat
-          this.mainMarker.setPosition([p.lng, p.lat])
-          this.$emit('pick', { lng: p.lng, lat: p.lat })
+          console.log('📍 地图拾取坐标:', p.lng, p.lat)
+          this.$emit('map-right-click', { lng: p.lng, lat: p.lat })
+        }
+
+        this.map.on('rightclick', handleMapClickPick)
+        this.map.on('dblclick', handleMapClickPick)
+
+        // 如果允许用户单独点击选点（在编辑或新建模式时）
+        if (this.pickable) {
+          this.mainMarker = new this.AMap.Marker({
+            position: [this.lng, this.lat],
+            draggable: true,
+          })
+          this.map.add(this.mainMarker)
+
+          this.map.on('click', e => {
+            const p = e.lnglat
+            this.mainMarker.setPosition([p.lng, p.lat])
+            this.$emit('pick', { lng: p.lng, lat: p.lat })
+          })
+        }
+
+        this.placeSearch = new this.AMap.PlaceSearch({ pageSize: 5, citylimit: false })
+        this.renderMarkersAndRoutes()
+      },
+
+      doSearch () {
+        const kw = (this.keyword || '').trim()
+        if (!kw || !this.placeSearch) return
+
+        this.placeSearch.search(kw, (status, result) => {
+          if (status !== 'complete' || !result?.poiList?.pois?.length) return
+          const poi = result.poiList.pois[0]
+          const lng = poi.location.lng
+          const lat = poi.location.lat
+          this.map.setCenter([lng, lat])
+          this.map.setZoom(15)
+          if (this.mainMarker) this.mainMarker.setPosition([lng, lat])
+          this.$emit('pick', { lng, lat, name: poi.name })
         })
-      }
+      },
 
-      this.placeSearch = new this.AMap.PlaceSearch({ pageSize: 5, citylimit: false })
-      this.renderMarkersAndRoutes()
-    },
+      // 🌟 核心：按天渲染不同颜色标记点 + 方向连线
+      renderMarkersAndRoutes () {
+        if (!this.map || !this.AMap) return
 
-    doSearch () {
-      const kw = (this.keyword || '').trim()
-      if (!kw || !this.placeSearch) return
+        // 1. 清除旧的点和折线
+        this.map.remove(this.renderedMarkers)
+        this.map.remove(this.renderedLines)
+        this.renderedMarkers = []
+        this.renderedLines = []
 
-      this.placeSearch.search(kw, (status, result) => {
-        if (status !== 'complete' || !result?.poiList?.pois?.length) return
-        const poi = result.poiList.pois[0]
-        const lng = poi.location.lng
-        const lat = poi.location.lat
-        this.map.setCenter([lng, lat])
-        this.map.setZoom(15)
-        if (this.mainMarker) this.mainMarker.setPosition([lng, lat])
-        this.$emit('pick', { lng, lat, name: poi.name })
-      })
-    },
+        if (!this.markers || this.markers.length === 0) return
 
-    // 🌟 核心：按天渲染不同颜色标记点 + 方向连线
-    renderMarkersAndRoutes () {
-      if (!this.map || !this.AMap) return
+        // 2. 将数据按第几天 (day) 分组
+        const dayGroups = {}
+        for (const m of this.markers) {
+          const d = m.day || 1
+          if (!dayGroups[d]) dayGroups[d] = []
+          dayGroups[d].push(m)
+        }
 
-      // 1. 清除旧的点和折线
-      this.map.remove(this.renderedMarkers)
-      this.map.remove(this.renderedLines)
-      this.renderedMarkers = []
-      this.renderedLines = []
+        // 3. 遍历每一天分别画点和路线
+        for (const dayStr of Object.keys(dayGroups)) {
+          const dayIndex = Number(dayStr)
+          const color = this.getDayColor(dayIndex)
+          const items = dayGroups[dayStr]
 
-      if (!this.markers || this.markers.length === 0) return
+          const pathCoords = []
 
-      // 2. 将数据按第几天 (day) 分组
-      const dayGroups = {}
-      this.markers.forEach(m => {
-        const d = m.day || 1
-        if (!dayGroups[d]) dayGroups[d] = []
-        dayGroups[d].push(m)
-      })
+          for (const m of items) {
+            const pos = [Number(m.lng), Number(m.lat)]
+            pathCoords.push(pos)
 
-      // 3. 遍历每一天分别画点和路线
-      Object.keys(dayGroups).forEach(dayStr => {
-        const dayIndex = Number(dayStr)
-        const color = this.getDayColor(dayIndex)
-        const items = dayGroups[dayStr]
-
-        const pathCoords = []
-
-        items.forEach(m => {
-          const pos = [Number(m.lng), Number(m.lat)]
-          pathCoords.push(pos)
-
-          // 创建漂亮的定制化 HTML 标记
-          const markerHtml = `
+            // 创建漂亮的定制化 HTML 标记
+            const markerHtml = `
               <div class="custom-trip-marker" style="background-color: ${color}; border-color: white;">
                 <span class="marker-badge">D${m.day || 1}</span>
                 <span class="marker-seq">${m.seq || ''}</span>
@@ -185,41 +189,41 @@ export default {
               </div>
             `
 
-          const marker = new this.AMap.Marker({
-            position: pos,
-            content: markerHtml,
-            offset: new this.AMap.Pixel(-18, -36), // 将点位锚定在中心底端
-            zIndex: 100 + (m.seq || 1)
-          })
+            const marker = new this.AMap.Marker({
+              position: pos,
+              content: markerHtml,
+              offset: new this.AMap.Pixel(-18, -36), // 将点位锚定在中心底端
+              zIndex: 100 + (m.seq || 1),
+            })
 
-          this.map.add(marker)
-          this.renderedMarkers.push(marker)
+            this.map.add(marker)
+            this.renderedMarkers.push(marker)
+          }
+
+          // 4. 当这一天有 2 个及以上景点时，画方向连接折线
+          if (pathCoords.length >= 2) {
+            const polyline = new this.AMap.Polyline({
+              path: pathCoords,
+              showDir: true, // 显示白色路线行进小箭头
+              strokeColor: color, // 使用对应天的配色
+              strokeWeight: 6, // 线粗
+              strokeOpacity: 0.85, // 透明度
+              lineJoin: 'round', // 圆滑转角
+            })
+            this.map.add(polyline)
+            this.renderedLines.push(polyline)
+          }
+        }
+
+        // 5. 自动缩放视野，把所有行程点一览无遗地展示在中间
+        this.$nextTick(() => {
+          if (this.renderedMarkers.length > 0) {
+            this.map.setFitView(this.renderedMarkers, false, [50, 50, 50, 50])
+          }
         })
-
-        // 4. 当这一天有 2 个及以上景点时，画方向连接折线
-        if (pathCoords.length >= 2) {
-          const polyline = new this.AMap.Polyline({
-            path: pathCoords,
-            showDir: true,         // 显示白色路线行进小箭头
-            strokeColor: color,    // 使用对应天的配色
-            strokeWeight: 6,       // 线粗
-            strokeOpacity: 0.85,   // 透明度
-            lineJoin: 'round',     // 圆滑转角
-          })
-          this.map.add(polyline)
-          this.renderedLines.push(polyline)
-        }
-      })
-
-      // 5. 自动缩放视野，把所有行程点一览无遗地展示在中间
-      this.$nextTick(() => {
-        if (this.renderedMarkers.length > 0) {
-          this.map.setFitView(this.renderedMarkers, false, [50, 50, 50, 50])
-        }
-      })
+      },
     },
-  },
-}
+  }
 </script>
 
 <style scoped>

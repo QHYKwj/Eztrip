@@ -106,6 +106,7 @@
 
   export default {
     name: 'TripPlanBoard',
+    emits: ['plan-changed'],
     props: {
       userId: { type: [Number, String], required: true },
       tripId: { type: [Number, String], required: true },
@@ -184,6 +185,7 @@
           this.showSnack('添加成功')
           this.addDialog = false
           await this.loadPlan()
+          this.$emit('plan-changed')
         } catch (error) {
           console.error(error)
           const msg = error.response?.data?.detail || '添加失败'
@@ -203,6 +205,7 @@
           })
           this.showSnack('删除成功')
           await this.loadPlan()
+          this.$emit('plan-changed')
         } catch (error) {
           console.error(error)
           const msg = error.response?.data?.detail || '删除失败'

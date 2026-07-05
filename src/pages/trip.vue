@@ -423,9 +423,11 @@
 
           <div class="mt-4">
             <TripPlanBoard
+              ref="planBoard"
               :editable="canEdit"
               :trip-id="tripId"
               :user-id="userId"
+              @plan-changed="fetchPlanMarkers"
             />
           </div>
         </v-col>
@@ -720,6 +722,10 @@
 
           // 重新拉取地图标注列表，地图立刻画出最新折线
           await this.fetchPlanMarkers()
+          // 🌟 2. 核心修复：直接调用子组件刷新左侧 Tag 列表！
+          if (this.$refs.planBoard && typeof this.$refs.planBoard.loadPlan === 'function') {
+            await this.$refs.planBoard.loadPlan()
+          }
         } catch (error) {
           console.error('地图添加点位失败:', error)
           this.showSnack(error?.response?.data?.detail || '添加失败，请重新试一次', 'error')
