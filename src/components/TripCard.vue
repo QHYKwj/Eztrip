@@ -32,17 +32,21 @@
       <div class="my-2 text-subtitle-1">行程时间：{{ renderTrip.days }}天</div>
     </v-card-text>
     <v-divider class="mx-4" />
-    <v-card-actions class="px-4 py-2 d-flex justify-space-between">
+
+    <!-- 操作按钮栏 -->
+    <v-card-actions class="px-4 py-2 d-flex justify-space-between align-center">
       <v-btn
         color="deep-purple lighten-2"
         :loading="favoriting"
         variant="text"
         @click.stop="favoriteTrip"
       >
-        一键收藏
+        {{ favorited ? '已收藏' : '一键收藏' }}
       </v-btn>
 
+      <!-- 🌟 核心优化：v-if="!isMyOwnTrip" 如果是自己创建过的行程，直接隐藏该按钮 -->
       <v-btn
+        v-if="!isMyOwnTrip"
         color="primary"
         variant="tonal"
         size="small"
@@ -52,7 +56,14 @@
       >
         一键复刻路线
       </v-btn>
+
+      <!-- 如果是本人创建的行程，给个小角标提示，更显专业 -->
+      <v-chip v-else color="purple-darken-1" size="small" variant="text" class="font-weight-medium">
+        <v-icon icon="mdi-account-check" start size="14" />
+        我的行程
+      </v-chip>
     </v-card-actions>
+
     <v-snackbar v-model="snack.show" :color="snack.color" timeout="2200">
       {{ snack.text }}
     </v-snackbar>
@@ -68,7 +79,6 @@ import axios from 'axios'
 export default {
   name: 'TripCard',
   props: {
-    // 原有完整trip对象，所有列表页面继续使用，保留required不改动
     trip: {
       type: Object,
       required: true,
@@ -86,7 +96,6 @@ export default {
         days: '',
       }),
     },
-    // 新增AI对话页面专用独立参数，非必填，不影响原有页面
     aiTripId: {
       type: Number,
       default: null,
@@ -110,9 +119,10 @@ export default {
     favoriteCount: 0,
     favoriting: false,
     favorited: false,
-    forking: false, // ✅ 新增：控制复刻按钮的加载状态
+    forking: false,
     favoriteIds: new Set(),
     favoriteIdsLoaded: false,
+    currentUserId: null, // ✅ 存储当前登录账号ID
     snack: { show: false, text: '', color: 'success' },
     fireworks: {
       show: false,
@@ -121,7 +131,6 @@ export default {
     },
   }),
   computed: {
-    // 核心兼容层：区分AI传参/正常列表传参，不修改原trip变量
     renderTrip () {
       if (this.aiTripId || this.aiTitle || this.aiDestination || this.aiDays) {
         return {
@@ -155,12 +164,27 @@ export default {
       if (s.includes('文化')) return '👨‍👩‍👧‍👦 文化'
       return '🏷️ 未知类型'
     },
+    // 🌟 核心判断属性：计算当前行程是否归属于自己
+    isMyOwnTrip () {
+      if (!this.currentUserId) return false
+      // 判断传入对象的 owner_user_id 或 author 是否与当前用户对得上
+      const ownerId = this.renderTrip.owner_user_id || this.renderTrip.author
+      if (ownerId && Number(ownerId) === Number(this.currentUserId)) {
+        return true
+      }
+      // 如果在上层处理列表中给该条目打了 editable=true 标签，那绝对是属于自己的
+      if (this.renderTrip.editable === true) {
+        return true
+      }
+      return false
+    }
   },
   watch: {
     trip: {
       deep: true,
       immediate: true,
       async handler () {
+        this.currentUserId = this.getUserId()
         await this.fetchUserFavoriteIds()
         await this.initFavoritedState()
         await this.fetchFavoriteCount()
@@ -168,12 +192,14 @@ export default {
     },
     aiTripId: {
       handler () {
+        this.currentUserId = this.getUserId()
         this.initFavoritedState()
         this.fetchFavoriteCount()
       },
     },
   },
   async mounted () {
+    this.currentUserId = this.getUserId()
     await this.fetchUserFavoriteIds()
     await this.initFavoritedState()
     await this.fetchFavoriteCount()
@@ -237,7 +263,6 @@ export default {
       this.snack.show = true
     },
 
-    // ✅ 新增：处理复刻操作
     async handleForkTrip () {
       const userId = this.getUserId()
       const tripId = this.renderTrip.trip_id || this.renderTrip.id
@@ -251,8 +276,8 @@ export default {
         return
       }
 
-      // 校验是否是自己创建的行程
-      if (this.renderTrip.owner_user_id && Number(this.renderTrip.owner_user_id) === Number(userId)) {
+      // 双层拦截：前端已经在界面隐藏按钮了，但这里仍做一层代码上的防呆
+      if (this.isMyOwnTrip) {
         this.showSnack('这是您自己创建的行程，无需复刻哦！', 'info')
         return
       }
@@ -265,7 +290,6 @@ export default {
 
         this.showSnack('🎉 路线复刻成功！已加入您的行程列表', 'success')
 
-        // 如果后端返回了新建行程的ID，延时后自动前往详情页方便用户调整
         if (res.data?.new_trip_id) {
           setTimeout(() => {
             this.$router.push({
