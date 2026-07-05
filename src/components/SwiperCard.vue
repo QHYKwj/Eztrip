@@ -18,6 +18,7 @@
   import welcome2 from '@/assets/welcome2.png'
   import welcome3 from '@/assets/welcome3.png'
   import welcome4 from '@/assets/welcome4.png'
+  import welcome5 from '@/assets/welcome5.png'
 
   const model = ref(0)
 
@@ -27,6 +28,7 @@
     welcome2,
     welcome3,
     welcome4,
+    welcome5,
   ]
 </script>
 

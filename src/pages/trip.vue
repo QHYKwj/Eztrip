@@ -1,15 +1,15 @@
 <template>
   <v-container class="py-6">
     <v-row align="center" class="mb-2">
-      <v-col cols="12" md="8">
-        <div class="d-flex align-center">
-          <h2 class="text-h5 font-weight-bold">
+      <v-col cols="12" md="7">
+        <div class="d-flex align-center flex-wrap gap-2">
+          <h2 class="text-h5 font-weight-bold mr-2">
             {{ tripDetail?.trip_name || '行程详情' }}
           </h2>
 
           <v-chip
             v-if="tripDetail?.is_ai === 1"
-            class="ai-badge font-weight-bold mr-1 ml-3"
+            class="ai-badge font-weight-bold"
             color="purple-darken-2"
             prepend-icon="mdi-robot-excited"
             size="small"
@@ -19,7 +19,6 @@
           </v-chip>
 
           <v-chip
-            class="ml-3"
             :color="statusColor"
             size="small"
             variant="outlined"
@@ -28,7 +27,6 @@
           </v-chip>
 
           <v-chip
-            class="ml-2"
             :color="tripDetail?.is_public ? 'success' : 'grey'"
             size="small"
             variant="outlined"
@@ -42,7 +40,18 @@
         </div>
       </v-col>
 
-      <v-col class="d-flex justify-end" cols="12" md="4">
+      <v-col class="d-flex justify-end align-center flex-wrap gap-2" cols="12" md="5">
+        <!-- 🚀 新增：生成行程海报长图按钮 -->
+        <v-btn
+          class="text-white mr-2"
+          color="#903DFE"
+          prepend-icon="mdi-camera-outline"
+          variant="elevated"
+          @click="openPosterDialog"
+        >
+          生成行程海报
+        </v-btn>
+
         <v-btn
           v-if="!editing && canEdit"
           color="primary"
@@ -470,6 +479,7 @@
       </v-row>
     </div>
 
+    <!-- 地图拾取点添加到行程弹窗 -->
     <v-dialog v-model="mapAddDialog.show" max-width="440">
       <v-card class="rounded-lg pa-2">
         <v-card-title class="d-flex align-center font-weight-bold text-subtitle-1 pt-3">
@@ -521,6 +531,103 @@
           >
             确认加入
           </v-btn>
+        </v-card-actions></v-card>
+    </v-dialog>
+
+    <!-- 📸 新增：行程长图海报预览与导出弹窗 -->
+    <v-dialog v-model="posterDialog.show" max-width="640">
+      <v-card class="rounded-xl overflow-hidden">
+        <v-card-title class="d-flex justify-space-between align-center px-6 py-4 bg-grey-lighten-4">
+          <span class="text-subtitle-1 font-weight-bold">行程分享长图预览</span>
+          <v-btn icon="mdi-close" size="small" variant="text" @click="posterDialog.show = false" />
+        </v-card-title>
+
+        <v-card-text class="pa-4 bg-grey-lighten-3" style="max-height: 70vh; overflow-y: auto;">
+          <!-- 真正用于 html2canvas 渲染下载的 DOM -->
+          <div ref="posterDOM" class="poster-container bg-white rounded-lg elevation-2 overflow-hidden mx-auto">
+            <!-- 海报头Banner -->
+            <div class="poster-header pa-6 text-white">
+              <div class="d-flex justify-space-between align-start">
+                <div>
+                  <span class="poster-tag px-2 py-1 rounded text-caption font-weight-bold">Eztrip 精选行程</span>
+                  <div class="text-h5 font-weight-bold mt-2">{{ tripDetail?.trip_name }}</div>
+                </div>
+                <v-icon class="opacity-80" icon="mdi-compass" size="40" />
+              </div>
+              <div class="mt-3 text-caption opacity-90 d-flex align-center">
+                <v-icon class="mr-1" icon="mdi-map-marker" size="14" /> {{ tripDetail?.destination }}
+                <span class="mx-2">|</span>
+                <v-icon class="mr-1" icon="mdi-calendar" size="14" /> {{ tripDetail?.start_date }} ~ {{ tripDetail?.end_date }}
+              </div>
+            </div>
+
+            <!-- 避坑提醒简报 (如果有) -->
+            <div v-if="tripDetail?.remarks?.overview" class="pa-4 bg-purple-lighten-5 border-bottom">
+              <div class="text-caption font-weight-bold text-primary mb-1">🤖 AI 导游概览</div>
+              <div class="text-caption text-grey-darken-3 lh-sm">{{ tripDetail.remarks.overview }}</div>
+            </div>
+
+            <!-- 每天行程时间轴 -->
+            <div class="pa-5">
+              <div class="text-subtitle-2 font-weight-bold text-grey-darken-3 mb-4 d-flex align-center">
+                <v-icon class="mr-2" color="primary" icon="mdi-timeline-outline" size="20" /> 详细路线打卡安排
+              </div>
+
+              <div v-if="posterPlans.length === 0" class="text-caption text-grey text-center py-4">
+                暂无具体按天规划打卡点~
+              </div>
+
+              <div v-else class="timeline-container">
+                <div v-for="day in posterPlans" :key="day.id" class="timeline-item mb-4">
+                  <div class="d-flex align-center mb-1">
+                    <span class="day-badge px-2 py-0.5 rounded mr-2 font-weight-bold">Day {{ day.day_index }}</span>
+                    <span class="text-caption text-grey font-weight-medium">{{ day.plan_date || '' }}</span>
+                  </div>
+                  <div v-if="day.note" class="text-caption text-grey-darken-1 mb-2 pl-2 border-left-note">
+                    📝 {{ day.note }}
+                  </div>
+                  <!-- 当天站点 -->
+                  <div class="d-flex flex-wrap gap-1.5 pl-2">
+                    <span
+                      v-for="(item, idx) in day.items"
+                      :key="idx"
+                      class="tag-item px-2 py-1 rounded text-caption font-weight-medium bg-grey-lighten-4 text-grey-darken-3"
+                    >
+                      <v-icon class="mr-0.5" color="primary" icon="mdi-map-marker-check" size="12" />{{ item.title }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 海报底部 -->
+            <div class="poster-footer pa-4 bg-grey-lighten-5 d-flex align-center justify-space-between border-top">
+              <div class="d-flex align-center">
+                <!-- 占位二维码标志 -->
+                <v-icon class="mr-3" color="primary" icon="mdi-qrcode" size="36" />
+                <div>
+                  <div class="text-caption font-weight-bold text-grey-darken-3">探索更多 Eztrip 路线</div>
+                  <div class="text-caption text-grey" style="font-size: 10px;">让每次出行都安全、舒适、经济</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-caption text-primary font-weight-bold">Eztrip 平台</span>
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+
+        <v-card-actions class="pa-4 bg-white justify-end border-top">
+          <v-btn color="grey" variant="text" @click="posterDialog.show = false">取消</v-btn>
+          <v-btn
+            color="#903DFE"
+            :loading="posterDialog.exporting"
+            prepend-icon="mdi-download"
+            variant="elevated"
+            @click="downloadPoster"
+          >
+            保存为图片 (PNG)
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -533,6 +640,7 @@
 
 <script>
   import axios from 'axios'
+  import html2canvas from 'html2canvas' // 🌟 引入生成海报插件
   import TripMapInteractive from '@/components/TripMapInteractive.vue'
   import TripPlanBoard from '@/components/TripPlanBoard.vue'
 
@@ -595,6 +703,13 @@
         mapAddDialog: {
           show: false, lng: null, lat: null, title: '', dayIndex: 1, placeType: '景点', loading: false,
         },
+
+        // 🌟 新增：海报预览与数据源
+        posterDialog: {
+          show: false,
+          exporting: false,
+        },
+        posterPlans: [],
       }
     },
 
@@ -725,7 +840,6 @@
 
           const data = res?.data === undefined ? res : res.data
 
-          // 🌟 核心防线：归一化 remarks 数据结构，彻底杜绝 isSameVNodeType 底层崩溃！
           if (data && data.remarks && typeof data.remarks === 'object') {
             if (!Array.isArray(data.remarks.packing)) data.remarks.packing = []
             if (!Array.isArray(data.remarks.tips)) data.remarks.tips = []
@@ -868,6 +982,10 @@
           const res = await axios.get('/api/trip_plan/get', { params: { user_id: this.userId || 1, trip_id: this.tripId } })
           const planData = res.data
           const markersList = []
+
+          // 顺便保存给生成长图作为渲染源
+          this.posterPlans = Array.isArray(planData?.days) ? planData.days : []
+
           if (planData && Array.isArray(planData.days)) {
             for (const day of planData.days) {
               if (Array.isArray(day.items)) {
@@ -890,6 +1008,40 @@
           this.tagMarkers = markersList
         } catch (error) {
           console.error('获取行程地图标记失败:', error)
+        }
+      },
+
+      // 🌟 新增：触发打开海报预览窗
+      async openPosterDialog () {
+        await this.fetchPlanMarkers() // 重新确保拿到了按天划分的数据
+        this.posterDialog.show = true
+      },
+
+      // 🌟 新增：真正通过 html2canvas 下载长图
+      async downloadPoster () {
+        const dom = this.$refs.posterDOM
+        if (!dom) return
+        this.posterDialog.exporting = true
+        try {
+          const canvas = await html2canvas(dom, {
+            scale: 2, // 高倍率支持清晰截图
+            useCORS: true,
+            backgroundColor: '#ffffff',
+          })
+          const imgUrl = canvas.toDataURL('image/png')
+          const a = document.createElement('a')
+          a.href = imgUrl
+          a.download = `Eztrip_${this.tripDetail?.trip_name || '行程分享'}.png`
+          document.body.append(a)
+          a.click()
+          a.remove()
+          this.showSnack('🎉 行程分享图保存成功！', 'success')
+          this.posterDialog.show = false
+        } catch (error) {
+          console.error(error)
+          this.showSnack('长图生成出错，请重试', 'error')
+        } finally {
+          this.posterDialog.exporting = false
         }
       },
 
@@ -1049,5 +1201,28 @@
   0% { box-shadow: 0 0 0 0 rgba(186, 104, 200, 0.5); }
   70% { box-shadow: 0 0 0 6px rgba(186, 104, 200, 0); }
   100% { box-shadow: 0 0 0 0 rgba(186, 104, 200, 0); }
+}
+
+/* 🌟 海报专属样式 */
+.poster-container {
+  width: 100%;
+  max-width: 480px;
+}
+.poster-header {
+  background: linear-gradient(135deg, #6A4AC5 0%, #903DFE 100%);
+}
+.poster-tag {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+.day-badge {
+  background: #F3F2FD;
+  color: #742DD8;
+}
+.border-left-note {
+  border-left: 2px solid #D8B4FE;
+}
+.gap-1\.5 {
+  gap: 6px;
 }
 </style>
