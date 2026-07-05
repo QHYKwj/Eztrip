@@ -129,7 +129,13 @@
 
                   <v-col class="py-3" cols="12">
                     <div class="text-subtitle-1 text-grey-darken-1">行程主题分类</div>
-                    <v-chip class="mt-1 font-weight-bold" color="deep-purple" label size="small" variant="tonal">
+                    <v-chip
+                      class="mt-1 font-weight-bold"
+                      color="deep-purple"
+                      label
+                      size="small"
+                      variant="tonal"
+                    >
                       <v-icon class="mr-1" size="14">mdi-tag-heart-outline</v-icon>
                       {{ tripDetail.class_text || '休闲' }}
                     </v-chip>
@@ -350,17 +356,38 @@
 
                     <template v-if="tripDetail?.remarks && typeof tripDetail.remarks === 'object'">
                       <v-col cols="12" md="6">
-                        <v-textarea v-model="tripDetail.remarks.overview" auto-grow density="compact" label="行程概述" rows="2" variant="outlined" />
+                        <v-textarea
+                          v-model="tripDetail.remarks.overview"
+                          auto-grow
+                          density="compact"
+                          label="行程概述"
+                          rows="2"
+                          variant="outlined"
+                        />
                       </v-col>
                       <v-col cols="12" md="6">
                         <v-text-field v-model="tripDetail.remarks.best_time" density="compact" label="最佳出行时间" variant="outlined" />
                         <v-text-field v-model="tripDetail.remarks.budget" density="compact" label="预估预算" variant="outlined" />
                       </v-col>
                       <v-col cols="12">
-                        <v-textarea v-model="tripDetail.remarks.accommodation" auto-grow density="compact" label="住宿建议" rows="2" variant="outlined" />
+                        <v-textarea
+                          v-model="tripDetail.remarks.accommodation"
+                          auto-grow
+                          density="compact"
+                          label="住宿建议"
+                          rows="2"
+                          variant="outlined"
+                        />
                       </v-col>
                       <v-col cols="12">
-                        <v-textarea v-model="tripDetail.remarks.food" auto-grow density="compact" label="美食推荐" rows="2" variant="outlined" />
+                        <v-textarea
+                          v-model="tripDetail.remarks.food"
+                          auto-grow
+                          density="compact"
+                          label="美食推荐"
+                          rows="2"
+                          variant="outlined"
+                        />
                       </v-col>
                       <v-col cols="12">
                         <v-combobox
@@ -505,496 +532,500 @@
 </template>
 
 <script>
-import TripMapInteractive from '@/components/TripMapInteractive.vue'
-import TripPlanBoard from '@/components/TripPlanBoard.vue'
-import axios from 'axios'
+  import axios from 'axios'
+  import TripMapInteractive from '@/components/TripMapInteractive.vue'
+  import TripPlanBoard from '@/components/TripPlanBoard.vue'
 
-export default {
-  name: 'Trip',
-  components: { TripMapInteractive, TripPlanBoard },
-  data () {
-    return {
-      tagMarkers: [],
-      favorited: false,
-      favoriting: false,
-      favoriteIds: new Set(),
-      favoriteIdsLoaded: false,
+  export default {
+    name: 'Trip',
+    components: { TripMapInteractive, TripPlanBoard },
+    data () {
+      return {
+        tagMarkers: [],
+        favorited: false,
+        favoriting: false,
+        favoriteIds: new Set(),
+        favoriteIdsLoaded: false,
 
-      fireworks: { show: false, rafId: null, timer: null },
+        fireworks: { show: false, rafId: null, timer: null },
 
-      userId: null,
-      tripId: null,
-      tripDetail: null,
+        userId: null,
+        tripId: null,
+        tripDetail: null,
 
-      favoriteCount: 0,
-      loading: false,
-      mapLoading: false,
-      error: null,
+        favoriteCount: 0,
+        loading: false,
+        mapLoading: false,
+        error: null,
 
-      editing: false,
-      saving: false,
-      formValid: false,
+        editing: false,
+        saving: false,
+        formValid: false,
 
-      editForm: {
-        trip_name: '',
-        destination: '',
-        start_date: '',
-        end_date: '',
-        class_type: 1, // 默认休闲
-        is_public: true,
-        publish_action: 'keep',
-      },
+        editForm: {
+          trip_name: '',
+          destination: '',
+          start_date: '',
+          end_date: '',
+          class_type: 1, // 默认休闲
+          is_public: true,
+          publish_action: 'keep',
+        },
 
-      classOptions: [
-        { text: '休闲', value: 1 },
-        { text: '美食', value: 2 },
-        { text: '商务', value: 3 },
-        { text: '家庭', value: 4 },
-      ],
+        classOptions: [
+          { text: '休闲', value: 1 },
+          { text: '美食', value: 2 },
+          { text: '商务', value: 3 },
+          { text: '家庭', value: 4 },
+        ],
 
-      publishActions: [
-        { text: '不更改发布状态', value: 'keep' },
-        { text: '提交审核（申请发布）', value: 'submit' },
-        { text: '取消发布（变为草稿）', value: 'unpublish' },
-      ],
+        publishActions: [
+          { text: '不更改发布状态', value: 'keep' },
+          { text: '提交审核（申请发布）', value: 'submit' },
+          { text: '取消发布（变为草稿）', value: 'unpublish' },
+        ],
 
-      snack: { show: false, text: '', color: 'success' },
+        snack: { show: false, text: '', color: 'success' },
 
-      rules: {
-        required: v => !!v || '必填',
-        date: v => /^\d{4}-\d{2}-\d{2}$/.test(v) || '日期格式应为 YYYY-MM-DD',
-      },
+        rules: {
+          required: v => !!v || '必填',
+          date: v => /^\d{4}-\d{2}-\d{2}$/.test(v) || '日期格式应为 YYYY-MM-DD',
+        },
 
-      mapAddDialog: {
-        show: false, lng: null, lat: null, title: '', dayIndex: 1, placeType: '景点', loading: false,
-      },
-    }
-  },
-
-  computed: {
-    canEdit () {
-      if (typeof this.tripDetail?.is_owner === 'boolean') return this.tripDetail.is_owner
-      if (this.tripDetail?.owner_user_id != null && this.userId != null) {
-        return Number(this.tripDetail.owner_user_id) === Number(this.userId)
+        mapAddDialog: {
+          show: false, lng: null, lat: null, title: '', dayIndex: 1, placeType: '景点', loading: false,
+        },
       }
-      return false
     },
-    statusText () {
-      const s = this.tripDetail?.publish_status
-      if (s === 'draft') return '未发布（草稿）'
-      if (s === 'pending') return '待审核'
-      if (s === 'published') return '已发布'
-      if (s === 'rejected') return '未通过'
-      return '未知状态'
-    },
-    statusColor () {
-      const s = this.tripDetail?.publish_status
-      if (s === 'draft') return 'grey'
-      if (s === 'pending') return 'warning'
-      if (s === 'published') return 'success'
-      if (s === 'rejected') return 'error'
-      return 'grey'
-    },
-    showFavoriteCount () {
-      return !!(this.tripDetail?.is_public && this.tripDetail?.publish_status === 'published')
-    },
-    dayOptions () {
-      if (!this.tripDetail?.start_date || !this.tripDetail?.end_date) return [{ text: '第 1 天', value: 1 }]
-      const start = new Date(this.tripDetail.start_date)
-      const end = new Date(this.tripDetail.end_date)
-      const days = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1)
-      return Array.from({ length: days }, (_, i) => ({ text: `第 ${i + 1} 天`, value: i + 1 }))
-    },
-  },
 
-  watch: {
-    '$route.params.tripId': {
-      async handler () {
-        this.syncRouteParams()
-        this.stopFireworks()
-        this.favorited = false
-        this.favoriting = false
-        this.favoriteCount = 0
-        this.tripDetail = null
-        this.error = null
-        this.editing = false
-        await this.fetchTripDetail()
+    computed: {
+      canEdit () {
+        if (typeof this.tripDetail?.is_owner === 'boolean') return this.tripDetail.is_owner
+        if (this.tripDetail?.owner_user_id != null && this.userId != null) {
+          return Number(this.tripDetail.owner_user_id) === Number(this.userId)
+        }
+        return false
+      },
+      statusText () {
+        const s = this.tripDetail?.publish_status
+        if (s === 'draft') return '未发布（草稿）'
+        if (s === 'pending') return '待审核'
+        if (s === 'published') return '已发布'
+        if (s === 'rejected') return '未通过'
+        return '未知状态'
+      },
+      statusColor () {
+        const s = this.tripDetail?.publish_status
+        if (s === 'draft') return 'grey'
+        if (s === 'pending') return 'warning'
+        if (s === 'published') return 'success'
+        if (s === 'rejected') return 'error'
+        return 'grey'
+      },
+      showFavoriteCount () {
+        return !!(this.tripDetail?.is_public && this.tripDetail?.publish_status === 'published')
+      },
+      dayOptions () {
+        if (!this.tripDetail?.start_date || !this.tripDetail?.end_date) return [{ text: '第 1 天', value: 1 }]
+        const start = new Date(this.tripDetail.start_date)
+        const end = new Date(this.tripDetail.end_date)
+        const days = Math.max(1, Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1)
+        return Array.from({ length: days }, (_, i) => ({ text: `第 ${i + 1} 天`, value: i + 1 }))
       },
     },
-  },
 
-  async created () {
-    this.userId = this.getUserIdFromStorage()
-    this.syncRouteParams()
-    await this.fetchUserFavoriteIds()
-    await this.fetchTripDetail()
-  },
-
-  beforeUnmount () {
-    this.stopFireworks()
-  },
-
-  methods: {
-    syncRouteParams () {
-      this.tripId = this.$route.params.tripId
-    },
-    getUserIdFromStorage () {
-      const userStr = sessionStorage.getItem('user')
-      if (!userStr) return null
-      try {
-        return JSON.parse(userStr).user_id || null
-      } catch {
-        return null
-      }
-    },
-
-    enterEdit () {
-      if (!this.canEdit) {
-        this.showSnack('收藏行程不可编辑', 'error')
-        return
-      }
-      this.editing = true
-      this.editForm.trip_name = this.tripDetail.trip_name
-      this.editForm.destination = this.tripDetail.destination
-      this.editForm.start_date = this.tripDetail.start_date
-      this.editForm.end_date = this.tripDetail.end_date
-      this.editForm.is_public = !!this.tripDetail.is_public
-      this.editForm.class_type = Number(this.tripDetail.class) || 1
-      this.editForm.publish_action = 'keep'
-
-      if (!this.tripDetail.remarks || typeof this.tripDetail.remarks !== 'object') {
-        this.tripDetail.remarks = {
-          overview: '', best_time: '', budget: '', accommodation: '', food: '', packing: [], tips: [],
-        }
-      }
-    },
-
-    cancelEdit () {
-      this.editing = false
-    },
-
-    showSnack (text, color = 'success') {
-      this.snack.text = text
-      this.snack.color = color
-      this.snack.show = true
-    },
-
-    async fetchTripDetail () {
-      if (!this.userId) this.userId = this.getUserIdFromStorage()
-      if (!this.tripId) {
-        this.error = '未指定行程 ID。'
-        return
-      }
-
-      this.loading = true
-      this.error = null
-      this.tripDetail = null
-      this.favoriteCount = 0
-
-      try {
-        const res = await axios.get('/api/trip/detail', {
-          params: { user_id: this.userId, trip_id: this.tripId },
-        })
-
-        const data = res?.data !== undefined ? res.data : res
-
-        // 🌟 核心防线：归一化 remarks 数据结构，彻底杜绝 isSameVNodeType 底层崩溃！
-        if (data && data.remarks && typeof data.remarks === 'object') {
-          if (!Array.isArray(data.remarks.packing)) data.remarks.packing = []
-          if (!Array.isArray(data.remarks.tips)) data.remarks.tips = []
-        }
-
-        this.tripDetail = data
-        this.favorited = !!this.tripDetail?.is_collected
-
-        if (this.favoriteIdsLoaded && this.userId && this.favoriteIds.has(Number(this.tripId))) {
-          this.favorited = true
-        }
-
-        if (this.showFavoriteCount) {
-          await this.fetchFavoriteCount()
-        }
-      } catch (error) {
-        console.error(error)
-        this.error = '获取行程详情失败'
-      } finally {
-        this.loading = false
-        this.editing = false
-      }
-
-      if (this.tripDetail) {
-        this.fetchPlanMarkers()
-      }
-    },
-
-    async fetchFavoriteCount () {
-      try {
-        const res = await axios.get('/api/trip/favorite-count', { params: { trip_id: this.tripId } })
-        this.favoriteCount = res.data.count || 0
-      } catch (error) {
-        console.error('获取收藏人数失败', error)
-      }
-    },
-
-    async saveEdit () {
-      if (!this.canEdit) {
-        this.showSnack('收藏行程不可编辑', 'error')
-        return
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.end_date)) {
-        this.showSnack('日期格式应为 YYYY-MM-DD', 'error')
-        return
-      }
-      if (new Date(this.editForm.end_date) < new Date(this.editForm.start_date)) {
-        this.showSnack('结束日期不能早于开始日期', 'error')
-        return
-      }
-
-      this.saving = true
-      try {
-        const payload = {
-          user_id: this.userId,
-          trip_id: Number(this.tripId),
-          trip_name: this.editForm.trip_name,
-          destination: this.editForm.destination,
-          start_date: this.editForm.start_date,
-          end_date: this.editForm.end_date,
-          class_type: Number(this.editForm.class_type),
-          is_public: this.editForm.is_public ? 1 : 0,
-          publish_action: this.editForm.publish_action,
-          remarks: this.tripDetail.remarks,
-        }
-
-        const res = await axios.put('/api/trip/update', payload)
-
-        if (res?.code === 200 || res?.data?.code === 200 || res?.status === 200) {
-          this.showSnack('保存成功 🎉', 'success')
+    watch: {
+      '$route.params.tripId': {
+        async handler () {
+          this.syncRouteParams()
+          this.stopFireworks()
+          this.favorited = false
+          this.favoriting = false
+          this.favoriteCount = 0
+          this.tripDetail = null
+          this.error = null
+          this.editing = false
           await this.fetchTripDetail()
-        } else {
-          this.showSnack(res?.message || res?.data?.message || '更新未成功', 'warning')
+        },
+      },
+    },
+
+    async created () {
+      this.userId = this.getUserIdFromStorage()
+      this.syncRouteParams()
+      await this.fetchUserFavoriteIds()
+      await this.fetchTripDetail()
+    },
+
+    beforeUnmount () {
+      this.stopFireworks()
+    },
+
+    methods: {
+      syncRouteParams () {
+        this.tripId = this.$route.params.tripId
+      },
+      getUserIdFromStorage () {
+        const userStr = sessionStorage.getItem('user')
+        if (!userStr) return null
+        try {
+          return JSON.parse(userStr).user_id || null
+        } catch {
+          return null
         }
-      } catch (error) {
-        console.error('更新行程报错:', error)
-        this.showSnack(error?.response?.data?.detail || error?.message || '保存失败，请检查日志', 'error')
-      } finally {
-        this.saving = false
-      }
-    },
+      },
 
-    async confirmDeleteTrip () {
-      if (!window.confirm('确定要永久删除这个行程吗？该操作不可恢复！')) return
-      try {
-        await axios.delete('/api/trip/delete', { params: { trip_id: this.tripId, user_id: this.userId } })
-        this.showSnack('行程已成功删除！', 'success')
-        setTimeout(() => { this.$router.push('/plan') }, 1000)
-      } catch (error) {
-        this.showSnack('删除失败: ' + (error.response?.data?.detail || error.message), 'error')
-      }
-    },
-
-    handleMapRightClick ({ lng, lat }) {
-      if (!this.canEdit) {
-        this.showSnack('收藏的行程为只读，不可在地图上添加路线', 'warning')
-        return
-      }
-      this.mapAddDialog.lng = Number(lng)
-      this.mapAddDialog.lat = Number(lat)
-      this.mapAddDialog.title = ''
-      this.mapAddDialog.dayIndex = 1
-      this.mapAddDialog.placeType = '景点'
-      this.mapAddDialog.show = true
-    },
-
-    async submitMapAddTag () {
-      if (!this.mapAddDialog.title.trim()) return
-      this.mapAddDialog.loading = true
-      try {
-        const payload = {
-          user_id: Number(this.userId),
-          trip_id: Number(this.tripId),
-          day_index: Number(this.mapAddDialog.dayIndex),
-          title: this.mapAddDialog.title.trim(),
-          place_type: this.mapAddDialog.placeType,
-          lng: this.mapAddDialog.lng,
-          lat: this.mapAddDialog.lat,
+      enterEdit () {
+        if (!this.canEdit) {
+          this.showSnack('收藏行程不可编辑', 'error')
+          return
         }
-        await axios.post('/api/trip_plan/item/add', payload)
-        this.showSnack(`🎉 已成功加入第 ${payload.day_index} 天行程！`, 'success')
-        this.mapAddDialog.show = false
-        await this.fetchPlanMarkers()
-        if (this.$refs.planBoard && typeof this.$refs.planBoard.loadPlan === 'function') {
-          await this.$refs.planBoard.loadPlan()
+        this.editing = true
+        this.editForm.trip_name = this.tripDetail.trip_name
+        this.editForm.destination = this.tripDetail.destination
+        this.editForm.start_date = this.tripDetail.start_date
+        this.editForm.end_date = this.tripDetail.end_date
+        this.editForm.is_public = !!this.tripDetail.is_public
+        this.editForm.class_type = Number(this.tripDetail.class) || 1
+        this.editForm.publish_action = 'keep'
+
+        if (!this.tripDetail.remarks || typeof this.tripDetail.remarks !== 'object') {
+          this.tripDetail.remarks = {
+            overview: '', best_time: '', budget: '', accommodation: '', food: '', packing: [], tips: [],
+          }
         }
-      } catch (error) {
-        this.showSnack(error?.response?.data?.detail || '添加失败', 'error')
-      } finally {
-        this.mapAddDialog.loading = false
-      }
-    },
+      },
 
-    handleMapPick () {},
+      cancelEdit () {
+        this.editing = false
+      },
 
-    async fetchPlanMarkers () {
-      try {
-        const res = await axios.get('/api/trip_plan/get', { params: { user_id: this.userId || 1, trip_id: this.tripId } })
-        const planData = res.data
-        const markersList = []
-        if (planData && Array.isArray(planData.days)) {
-          for (const day of planData.days) {
-            if (Array.isArray(day.items)) {
-              for (const [index, item] of day.items.entries()) {
-                if (item.lng && item.lat) {
-                  markersList.push({
-                    id: item.id,
-                    name: item.title,
-                    lng: Number(item.lng),
-                    lat: Number(item.lat),
-                    day: day.day_index,
-                    seq: index + 1,
-                    place_type: item.place_type,
-                  })
+      showSnack (text, color = 'success') {
+        this.snack.text = text
+        this.snack.color = color
+        this.snack.show = true
+      },
+
+      async fetchTripDetail () {
+        if (!this.userId) this.userId = this.getUserIdFromStorage()
+        if (!this.tripId) {
+          this.error = '未指定行程 ID。'
+          return
+        }
+
+        this.loading = true
+        this.error = null
+        this.tripDetail = null
+        this.favoriteCount = 0
+
+        try {
+          const res = await axios.get('/api/trip/detail', {
+            params: { user_id: this.userId, trip_id: this.tripId },
+          })
+
+          const data = res?.data === undefined ? res : res.data
+
+          // 🌟 核心防线：归一化 remarks 数据结构，彻底杜绝 isSameVNodeType 底层崩溃！
+          if (data && data.remarks && typeof data.remarks === 'object') {
+            if (!Array.isArray(data.remarks.packing)) data.remarks.packing = []
+            if (!Array.isArray(data.remarks.tips)) data.remarks.tips = []
+          }
+
+          this.tripDetail = data
+          this.favorited = !!this.tripDetail?.is_collected
+
+          if (this.favoriteIdsLoaded && this.userId && this.favoriteIds.has(Number(this.tripId))) {
+            this.favorited = true
+          }
+
+          if (this.showFavoriteCount) {
+            await this.fetchFavoriteCount()
+          }
+        } catch (error) {
+          console.error(error)
+          this.error = '获取行程详情失败'
+        } finally {
+          this.loading = false
+          this.editing = false
+        }
+
+        if (this.tripDetail) {
+          this.fetchPlanMarkers()
+        }
+      },
+
+      async fetchFavoriteCount () {
+        try {
+          const res = await axios.get('/api/trip/favorite-count', { params: { trip_id: this.tripId } })
+          this.favoriteCount = res.data.count || 0
+        } catch (error) {
+          console.error('获取收藏人数失败', error)
+        }
+      },
+
+      async saveEdit () {
+        if (!this.canEdit) {
+          this.showSnack('收藏行程不可编辑', 'error')
+          return
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(this.editForm.end_date)) {
+          this.showSnack('日期格式应为 YYYY-MM-DD', 'error')
+          return
+        }
+        if (new Date(this.editForm.end_date) < new Date(this.editForm.start_date)) {
+          this.showSnack('结束日期不能早于开始日期', 'error')
+          return
+        }
+
+        this.saving = true
+        try {
+          const payload = {
+            user_id: this.userId,
+            trip_id: Number(this.tripId),
+            trip_name: this.editForm.trip_name,
+            destination: this.editForm.destination,
+            start_date: this.editForm.start_date,
+            end_date: this.editForm.end_date,
+            class_type: Number(this.editForm.class_type),
+            is_public: this.editForm.is_public ? 1 : 0,
+            publish_action: this.editForm.publish_action,
+            remarks: this.tripDetail.remarks,
+          }
+
+          const res = await axios.put('/api/trip/update', payload)
+
+          if (res?.code === 200 || res?.data?.code === 200 || res?.status === 200) {
+            this.showSnack('保存成功 🎉', 'success')
+            await this.fetchTripDetail()
+          } else {
+            this.showSnack(res?.message || res?.data?.message || '更新未成功', 'warning')
+          }
+        } catch (error) {
+          console.error('更新行程报错:', error)
+          this.showSnack(error?.response?.data?.detail || error?.message || '保存失败，请检查日志', 'error')
+        } finally {
+          this.saving = false
+        }
+      },
+
+      async confirmDeleteTrip () {
+        if (!window.confirm('确定要永久删除这个行程吗？该操作不可恢复！')) return
+        try {
+          await axios.delete('/api/trip/delete', { params: { trip_id: this.tripId, user_id: this.userId } })
+          this.showSnack('行程已成功删除！', 'success')
+          setTimeout(() => {
+            this.$router.push('/plan')
+          }, 1000)
+        } catch (error) {
+          this.showSnack('删除失败: ' + (error.response?.data?.detail || error.message), 'error')
+        }
+      },
+
+      handleMapRightClick ({ lng, lat }) {
+        if (!this.canEdit) {
+          this.showSnack('收藏的行程为只读，不可在地图上添加路线', 'warning')
+          return
+        }
+        this.mapAddDialog.lng = Number(lng)
+        this.mapAddDialog.lat = Number(lat)
+        this.mapAddDialog.title = ''
+        this.mapAddDialog.dayIndex = 1
+        this.mapAddDialog.placeType = '景点'
+        this.mapAddDialog.show = true
+      },
+
+      async submitMapAddTag () {
+        if (!this.mapAddDialog.title.trim()) return
+        this.mapAddDialog.loading = true
+        try {
+          const payload = {
+            user_id: Number(this.userId),
+            trip_id: Number(this.tripId),
+            day_index: Number(this.mapAddDialog.dayIndex),
+            title: this.mapAddDialog.title.trim(),
+            place_type: this.mapAddDialog.placeType,
+            lng: this.mapAddDialog.lng,
+            lat: this.mapAddDialog.lat,
+          }
+          await axios.post('/api/trip_plan/item/add', payload)
+          this.showSnack(`🎉 已成功加入第 ${payload.day_index} 天行程！`, 'success')
+          this.mapAddDialog.show = false
+          await this.fetchPlanMarkers()
+          if (this.$refs.planBoard && typeof this.$refs.planBoard.loadPlan === 'function') {
+            await this.$refs.planBoard.loadPlan()
+          }
+        } catch (error) {
+          this.showSnack(error?.response?.data?.detail || '添加失败', 'error')
+        } finally {
+          this.mapAddDialog.loading = false
+        }
+      },
+
+      handleMapPick () {},
+
+      async fetchPlanMarkers () {
+        try {
+          const res = await axios.get('/api/trip_plan/get', { params: { user_id: this.userId || 1, trip_id: this.tripId } })
+          const planData = res.data
+          const markersList = []
+          if (planData && Array.isArray(planData.days)) {
+            for (const day of planData.days) {
+              if (Array.isArray(day.items)) {
+                for (const [index, item] of day.items.entries()) {
+                  if (item.lng && item.lat) {
+                    markersList.push({
+                      id: item.id,
+                      name: item.title,
+                      lng: Number(item.lng),
+                      lat: Number(item.lat),
+                      day: day.day_index,
+                      seq: index + 1,
+                      place_type: item.place_type,
+                    })
+                  }
                 }
               }
             }
           }
+          this.tagMarkers = markersList
+        } catch (error) {
+          console.error('获取行程地图标记失败:', error)
         }
-        this.tagMarkers = markersList
-      } catch (error) {
-        console.error('获取行程地图标记失败:', error)
-      }
-    },
+      },
 
-    getUserId () {
-      const raw = sessionStorage.getItem('user') || localStorage.getItem('user')
-      if (!raw) return null
-      try { return JSON.parse(raw).user_id || null } catch { return null }
-    },
+      getUserId () {
+        const raw = sessionStorage.getItem('user') || localStorage.getItem('user')
+        if (!raw) return null
+        try {
+          return JSON.parse(raw).user_id || null
+        } catch {
+          return null
+        }
+      },
 
-    async fetchUserFavoriteIds () {
-      const userId = this.getUserId()
-      if (!userId) {
-        this.favoriteIds = new Set()
-        this.favoriteIdsLoaded = true
-        return
-      }
-      try {
-        const res = await axios.post('/api/collect/favorite/list', { user_id: userId })
-        if (res.data?.code === 200 && Array.isArray(res.data?.data?.trip_ids)) {
-          this.favoriteIds = new Set(res.data.data.trip_ids.map(Number))
-        } else {
+      async fetchUserFavoriteIds () {
+        const userId = this.getUserId()
+        if (!userId) {
           this.favoriteIds = new Set()
+          this.favoriteIdsLoaded = true
+          return
         }
-        this.favoriteIdsLoaded = true
-      } catch {
-        this.favoriteIds = new Set()
-        this.favoriteIdsLoaded = true
-      }
-    },
+        try {
+          const res = await axios.post('/api/collect/favorite/list', { user_id: userId })
+          this.favoriteIds = res.data?.code === 200 && Array.isArray(res.data?.data?.trip_ids) ? new Set(res.data.data.trip_ids.map(Number)) : new Set()
+          this.favoriteIdsLoaded = true
+        } catch {
+          this.favoriteIds = new Set()
+          this.favoriteIdsLoaded = true
+        }
+      },
 
-    async toggleFavorite () {
-      const userId = this.getUserId()
-      const tripId = Number(this.tripId)
-      if (!userId) return this.showSnack('请先登录再收藏', 'error')
-      if (this.favoriting) return
-      await (this.favorited ? this.unfavoriteTrip(userId, tripId) : this.favoriteTrip(userId, tripId))
-    },
+      async toggleFavorite () {
+        const userId = this.getUserId()
+        const tripId = Number(this.tripId)
+        if (!userId) return this.showSnack('请先登录再收藏', 'error')
+        if (this.favoriting) return
+        await (this.favorited ? this.unfavoriteTrip(userId, tripId) : this.favoriteTrip(userId, tripId))
+      },
 
-    async favoriteTrip (userId, tripId) {
-      this.favoriting = true
-      try {
-        const res = await axios.post('/api/collect/favorite/add', { user_id: userId, trip_id: tripId })
-        if (res.data?.code === 200) {
-          this.favorited = true
-          this.favoriteIds.add(Number(tripId))
-          this.showSnack('收藏成功 🎉', 'success')
-          await this.fetchFavoriteCount()
-          this.playFireworks()
-        } else {
-          this.showSnack(res.data?.message || '收藏失败', 'warning')
-        }
-      } catch (error) {
-        if (error.response?.status === 400) {
-          this.favorited = true
-          this.favoriteIds.add(Number(tripId))
-          this.showSnack('你已经收藏过这个行程啦 ❤️', 'info')
-        }
-      } finally {
-        this.favoriting = false
-      }
-    },
-
-    async unfavoriteTrip (userId, tripId) {
-      this.favoriting = true
-      try {
-        const res = await axios.post('/api/collect/favorite/remove', { user_id: userId, trip_id: tripId })
-        if (res.data?.code === 200) {
-          this.favorited = false
-          this.favoriteIds.delete(Number(tripId))
-          this.showSnack('已取消收藏', 'success')
-          await this.fetchFavoriteCount()
-        } else {
-          this.showSnack(res.data?.message || '取消失败', 'warning')
-        }
-      } catch (error) {
-        if (error.response?.status === 400) {
-          this.favorited = false
-          this.favoriteIds.delete(Number(tripId))
-          this.showSnack('你还没收藏这个行程', 'info')
-        }
-      } finally {
-        this.favoriting = false
-      }
-    },
-
-    playFireworks () {
-      this.stopFireworks()
-      this.fireworks.show = true
-      this.$nextTick(() => {
-        const canvas = this.$refs.fireCanvas
-        if (!canvas) return
-        const rect = canvas.getBoundingClientRect()
-        canvas.width = Math.floor(rect.width)
-        canvas.height = Math.floor(rect.height)
-        const ctx = canvas.getContext('2d')
-        const W = canvas.width, H = canvas.height
-        const particles = []
-        for (let b = 0; b < 4; b++) {
-          const cx = W * (0.25 + 0.5 * Math.random()), cy = H * (0.25 + 0.35 * Math.random())
-          for (let i = 0; i < 60; i++) {
-            const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 4
-            particles.push({
-              x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
-              life: 60 + Math.random() * 30, r: 2 + Math.random() * 2,
-              color: ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#b388ff'][Math.floor(Math.random() * 5)],
-            })
+      async favoriteTrip (userId, tripId) {
+        this.favoriting = true
+        try {
+          const res = await axios.post('/api/collect/favorite/add', { user_id: userId, trip_id: tripId })
+          if (res.data?.code === 200) {
+            this.favorited = true
+            this.favoriteIds.add(Number(tripId))
+            this.showSnack('收藏成功 🎉', 'success')
+            await this.fetchFavoriteCount()
+            this.playFireworks()
+          } else {
+            this.showSnack(res.data?.message || '收藏失败', 'warning')
           }
+        } catch (error) {
+          if (error.response?.status === 400) {
+            this.favorited = true
+            this.favoriteIds.add(Number(tripId))
+            this.showSnack('你已经收藏过这个行程啦 ❤️', 'info')
+          }
+        } finally {
+          this.favoriting = false
         }
-        const step = () => {
-          ctx.clearRect(0, 0, W, H)
-          ctx.globalCompositeOperation = 'lighter'
-          for (const p of particles) {
-            p.life -= 1; p.vx *= 0.98; p.vy *= 0.98; p.vy += 0.06; p.x += p.vx; p.y += p.vy
-            if (p.life > 0) {
-              ctx.beginPath(); ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life / 90)
-              ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill()
+      },
+
+      async unfavoriteTrip (userId, tripId) {
+        this.favoriting = true
+        try {
+          const res = await axios.post('/api/collect/favorite/remove', { user_id: userId, trip_id: tripId })
+          if (res.data?.code === 200) {
+            this.favorited = false
+            this.favoriteIds.delete(Number(tripId))
+            this.showSnack('已取消收藏', 'success')
+            await this.fetchFavoriteCount()
+          } else {
+            this.showSnack(res.data?.message || '取消失败', 'warning')
+          }
+        } catch (error) {
+          if (error.response?.status === 400) {
+            this.favorited = false
+            this.favoriteIds.delete(Number(tripId))
+            this.showSnack('你还没收藏这个行程', 'info')
+          }
+        } finally {
+          this.favoriting = false
+        }
+      },
+
+      playFireworks () {
+        this.stopFireworks()
+        this.fireworks.show = true
+        this.$nextTick(() => {
+          const canvas = this.$refs.fireCanvas
+          if (!canvas) return
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = Math.floor(rect.width)
+          canvas.height = Math.floor(rect.height)
+          const ctx = canvas.getContext('2d')
+          const W = canvas.width, H = canvas.height
+          const particles = []
+          for (let b = 0; b < 4; b++) {
+            const cx = W * (0.25 + 0.5 * Math.random()), cy = H * (0.25 + 0.35 * Math.random())
+            for (let i = 0; i < 60; i++) {
+              const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 4
+              particles.push({
+                x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                life: 60 + Math.random() * 30, r: 2 + Math.random() * 2,
+                color: ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#b388ff'][Math.floor(Math.random() * 5)],
+              })
             }
           }
-          if (particles.some(p => p.life > 0)) this.fireworks.rafId = requestAnimationFrame(step)
-        }
-        step()
-        this.fireworks.timer = setTimeout(() => { this.stopFireworks() }, 2200)
-      })
-    },
+          const step = () => {
+            ctx.clearRect(0, 0, W, H)
+            ctx.globalCompositeOperation = 'lighter'
+            for (const p of particles) {
+              p.life -= 1; p.vx *= 0.98; p.vy *= 0.98; p.vy += 0.06; p.x += p.vx; p.y += p.vy
+              if (p.life > 0) {
+                ctx.beginPath(); ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life / 90)
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill()
+              }
+            }
+            if (particles.some(p => p.life > 0)) this.fireworks.rafId = requestAnimationFrame(step)
+          }
+          step()
+          this.fireworks.timer = setTimeout(() => {
+            this.stopFireworks()
+          }, 2200)
+        })
+      },
 
-    stopFireworks () {
-      if (this.fireworks.rafId) cancelAnimationFrame(this.fireworks.rafId)
-      if (this.fireworks.timer) clearTimeout(this.fireworks.timer)
-      this.fireworks.rafId = null
-      this.fireworks.timer = null
-      this.fireworks.show = false
+      stopFireworks () {
+        if (this.fireworks.rafId) cancelAnimationFrame(this.fireworks.rafId)
+        if (this.fireworks.timer) clearTimeout(this.fireworks.timer)
+        this.fireworks.rafId = null
+        this.fireworks.timer = null
+        this.fireworks.show = false
+      },
     },
-  },
-}
+  }
 </script>
 
 <style scoped>

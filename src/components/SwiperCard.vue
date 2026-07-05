@@ -1,35 +1,42 @@
 <template>
-  <v-carousel v-model="model" height="100%">
-    <v-carousel-item v-for="(src) in slides" :key="src">
+  <v-carousel v-model="model" height="100%" hide-delimiter-background show-arrows="hover">
+    <v-carousel-item v-for="(src, index) in slides" :key="index">
       <v-sheet height="100%" tile>
-        <v-row align="center" class="fill-height" justify="center">
-          <v-img contain :src="src" />
+        <v-row align="center" class="fill-height" justify="center" no-gutters>
+          <v-img class="h-100 w-100" cover :src="src" />
         </v-row>
       </v-sheet>
     </v-carousel-item>
   </v-carousel>
 </template>
-<script>
-  export default {
-    data: () => ({
-      model: 0,
-      slides: [
-        'https://picsum.photos/1920/1080?random',
-        'https://picsum.photos/1920/1081?random',
-        'https://picsum.photos/1920/1082?random',
-        'https://picsum.photos/1920/1083?random',
-      ],
-    }),
-  }
+
+<script setup>
+  import { ref } from 'vue'
+
+  // 1. ✅ 必须通过 import 引入本地静态图片，Vite 才能在编译时正确识别并打包路径
+  import welcome1 from '@/assets/welcome1.png'
+  import welcome2 from '@/assets/welcome2.png'
+  import welcome3 from '@/assets/welcome3.png'
+  import welcome4 from '@/assets/welcome4.png'
+
+  const model = ref(0)
+
+  // 2. ✅ 将引入的图片变量直接放入数组中
+  const slides = [
+    welcome1,
+    welcome2,
+    welcome3,
+    welcome4,
+  ]
 </script>
+
 <style scoped>
 .full-screen-carousel {
-  width: auto;  /* 设置宽度为视口宽度 */
+  width: auto;
   margin: 0;
   padding: 0;
 }
 
-/* 确保没有外部元素限制 */
 html, body {
   margin: 0;
   padding: 0;
