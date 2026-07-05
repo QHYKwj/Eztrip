@@ -16,7 +16,13 @@ from typing import Optional, Dict, Any
 
 router = APIRouter(prefix="/api/trip", tags=["trip_details"])
 
-
+# 🌟 行程分类映射字典
+CLASS_MAP = {
+    1: "休闲",
+    2: "美食",
+    3: "商务",
+    4: "家庭",
+}
 async def geocode_destination(destination: str):
     """destination -> (lng, lat) via AMap geocode"""
     if not destination or not destination.strip():
@@ -131,6 +137,11 @@ async def trip_detail(
                 # 如果解析失败（兼容以前存入的纯 Markdown 文本），直接返回原字符串
                 parsed_remarks = trip["remarks"]
 
+        # 🌟 处理 class 分类并返回 class_text
+        cls_int = (
+            int(trip["class"]) if trip.get("class") is not None else 1
+        )  # 默认给1休闲
+
         return {
             "trip_id": int(trip["trip_id"]),
             "owner_user_id": owner_id,
@@ -152,6 +163,7 @@ async def trip_detail(
             "is_favorited": trip["fav_user_id"] is not None,
 
             "class": int(trip["class"]) if trip["class"] is not None else None,
+            "class_text": CLASS_MAP.get(cls_int, "休闲"),  # 🌟 返回文本
             "remarks": parsed_remarks, # <--- 给前端透传解析好的字典或原始字符串
             "lng": lng,
             "lat": lat,
@@ -227,6 +239,7 @@ class TripUpdateBody(BaseModel):
     end_date: str    # YYYY-MM-DD
     is_public: int   # 0/1
     publish_action: str  # keep / submit / unpublish
+    class_type: Optional[int] = 1  # 🌟 增加分类字段更新
     remarks: Optional[Dict[str, Any]] = None  # ✅ 允许前端传回整个 JSON 对象
 
 
@@ -283,17 +296,27 @@ async def update_trip(body: TripUpdateBody):
         # ✅ 将前端传来的字典转回 JSON 字符串
         remarks_str = json.dumps(body.remarks, ensure_ascii=False) if body.remarks else None
 
-        # ✅ 3) 更新
+        # 🌟 SQL 更新语句中同步更新 `class` 字段
         if new_status:
-            cursor.execute("""
+            cursor.execute(
+                """
                 UPDATE trip
                 SET title=%s, destination=%s, start_date=%s, end_date=%s,
-                    is_public=%s, publish_status=%s, remarks=%s
+                    is_public=%s, publish_status=%s, `class`=%s, remarks=%s
                 WHERE trip_id=%s
-            """, (
-                body.trip_name, body.destination, body.start_date, body.end_date,
-                int(body.is_public), new_status, remarks_str, body.trip_id
-            ))
+            """,
+                (
+                    body.trip_name,
+                    body.destination,
+                    body.start_date,
+                    body.end_date,
+                    int(body.is_public),
+                    new_status,
+                    body.class_type,
+                    remarks_str,
+                    body.trip_id,
+                ),
+            )
         else:
             cursor.execute("""
                 UPDATE trip
@@ -306,7 +329,8 @@ async def update_trip(body: TripUpdateBody):
             ))
 
         db_conn.commit()
-        return {"message": "Trip updated successfully"}
+        # 🌟 核心修复：加上 "code": 200 防止 axios 前端拦截器报异常！
+        return {"message": "Trip updated successfully", "code": 200}
 
     except HTTPException:
         raise

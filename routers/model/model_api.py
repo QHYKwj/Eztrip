@@ -115,6 +115,7 @@ AGENT_SYSTEM_PROMPT = """
   "reply_text": "亲切的回复话语...",
   "trip_title": "行程标题，如：'广州3日游'",
   "destination": "目的地城市名称",
+  "class_type": 1,
   "total_days": 3,
   "overview": "100字内概述",
   "best_time": "推荐季节及原因",
@@ -134,6 +135,7 @@ AGENT_SYSTEM_PROMPT = """
     }
   ]
 }
+注意：其中 class_type 为数字，仅限1至4之间的一位数字（1代表休闲，2代表美食，3代表商务，4代表家庭），请自动按主题评估归类。
 """
 def safe_json_load(s: str):
     """
@@ -209,6 +211,13 @@ async def generate_and_save_plan(request: AgentPlanRequest):
             start_date = date.today()
             total_days = ai_data.get("total_days", 1)
             end_date = start_date + timedelta(days=total_days - 1)
+            # 🌟 校验提取 class_type，若模型没传或传错，默认给 1(休闲)
+            try:
+                class_type = int(ai_data.get("class_type", 1))
+                if class_type not in [1, 2, 3, 4]:
+                    class_type = 1
+            except Exception:
+                class_type = 1
             # 🌟 核心修改：将 AI 生成的锦囊数据打包成标准字典
             remarks_dict = {
                 "overview": ai_data.get("overview", "一场说走就走的旅行"),
@@ -221,10 +230,10 @@ async def generate_and_save_plan(request: AgentPlanRequest):
             }
             # 转为 JSON 字符串准备存入数据库
             remarks_json = json.dumps(remarks_dict, ensure_ascii=False)
-            # 插入 trip 表 (默认设为草稿状态)
+            # 🌟 核心修改：INSERT 中加入 class
             insert_trip_sql = """
-                INSERT INTO trip (owner_user_id, title, destination, start_date, end_date,is_ai, publish_status, is_public, remarks)
-                VALUES (%s, %s, %s, %s, %s, 1,'draft', 0, %s)
+                INSERT INTO trip (owner_user_id, title, destination, start_date, end_date, `class`, is_ai, publish_status, is_public, remarks)
+                VALUES (%s, %s, %s, %s, %s, %s, 1, 'draft', 0, %s)
             """
             cursor.execute(insert_trip_sql, (
                 request.user_id,
@@ -232,6 +241,7 @@ async def generate_and_save_plan(request: AgentPlanRequest):
                 ai_data.get("destination", "未知目的地"),
                 start_date,
                 end_date,
+                class_type,  # 🌟 写入分类
                 remarks_json
             ))
             trip_id = cursor.lastrowid
@@ -272,7 +282,8 @@ async def generate_and_save_plan(request: AgentPlanRequest):
         return {
             "reply": ai_data.get("reply_text", "已经为您规划好行程并保存至草稿箱。"),
             "trip_id": trip_id,
-            "structured_data": ai_data
+            "structured_data": ai_data,
+            "code": 200,  # 🌟 加上标准返回码
         }
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
