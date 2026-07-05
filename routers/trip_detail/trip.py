@@ -1,17 +1,13 @@
 # routers/trip_detail/trip.py
-# routers/trip_detail/trip.py
 from fastapi import APIRouter, HTTPException, Query
 from config.connect_db import connect_db
 import httpx
 from datetime import datetime, date
 from settings import AMAP_WEB_KEY
-from fastapi import APIRouter, HTTPException, Query
 import os
 import urllib.parse
 from pydantic import BaseModel
-from config.connect_db import connect_db
-from datetime import datetime
-import json # 确保顶部引入了 json
+import json
 from typing import Optional, Dict, Any
 
 router = APIRouter(prefix="/api/trip", tags=["trip_details"])
@@ -67,11 +63,6 @@ def to_str(x):
         return x.strftime("%Y-%m-%d")
     return str(x)
 
-
-from fastapi import APIRouter, HTTPException, Query
-from config.connect_db import connect_db
-
-router = APIRouter(prefix="/api/trip", tags=["trip_details"])
 
 @router.get("/detail")
 async def trip_detail(

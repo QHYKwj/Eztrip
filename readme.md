@@ -22,6 +22,7 @@
    pip install uvicorn
    pip install httpx
    pip install requests
+   pip install openai
    ```
    // MySQL Connector<br>
    pip install mysql-connector-python

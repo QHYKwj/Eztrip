@@ -78,18 +78,6 @@ CREATE TABLE notice (
   CONSTRAINT fk_notice_creator
     FOREIGN KEY (created_by) REFERENCES user_info(user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE TABLE notice (
-                        notice_id    INT UNSIGNED NOT NULL AUTO_INCREMENT,
-                        title        VARCHAR(255) NOT NULL,
-                        content      TEXT NOT NULL,
-                        created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        created_by   INT UNSIGNED NOT NULL,          -- 发布管理员 user_id
-                        is_active    TINYINT(1) NOT NULL DEFAULT 1,  -- 是否有效（可以软删除）
-
-                        PRIMARY KEY (notice_id),
-                        CONSTRAINT fk_notice_creator
-                            FOREIGN KEY (created_by) REFERENCES user_info(user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE message (
                          message_id   INT UNSIGNED NOT NULL AUTO_INCREMENT,
                          sender_id    INT UNSIGNED NOT NULL,   -- 发送者（通常是管理员，但设计成任意用户也行）

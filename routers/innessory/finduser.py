@@ -24,7 +24,7 @@ async def find_user(username: str = Form(...)):
                 detail = "Failed to connect database"
             )
         
-        cursor = db_conn.cursor(dictionary="true")
+        cursor = db_conn.cursor(dictionary=True)
 
         # 3.查询用户信息
         query = "SELECT username,avatar,email FROM user_info WHERE username = %s ;"
